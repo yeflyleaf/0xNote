@@ -3,22 +3,30 @@
   🏠 0xNote 主应用组件
 
   【职责】
-  1. 组装标题栏、编辑器、状态栏
+  1. 组装标题栏、编辑器、预览面板、状态栏
   2. 处理应用初始化（检查启动参数）
   3. 协调编辑器与 Store 的通信
+  4. 实现分栏布局和视图切换
 -->
 <script setup lang="ts">
-import { MemoEditor, StatusBar, TitleBar } from '@/components'
+import { MemoEditor, MemoPreview, StatusBar, TitleBar } from '@/components'
+import SettingsModal from '@/components/SettingsModal.vue'
 import { useAppStore, useFileStore } from '@/stores'
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 
 const fileStore = useFileStore()
 const appStore = useAppStore()
 
+// 编辑器和预览组件引用（用于滚动同步）
+const editorRef = ref<InstanceType<typeof MemoEditor> | null>(null)
+const previewRef = ref<InstanceType<typeof MemoPreview> | null>(null)
+
+// 是否正在同步滚动（防止循环）
+let isSyncingScroll = false
+
 // ========== 生命周期 ==========
 
 onMounted(async () => {
-  // 初始化应用
   // 初始化应用
   let args: string[] = []
   if (window.electron) {
@@ -54,6 +62,22 @@ function handleContentChange(content: string): void {
 async function handleSave(): Promise<void> {
   await fileStore.saveFile()
 }
+
+/**
+ * 处理预览滚动事件（用于同步滚动）
+ */
+function handlePreviewScroll(scrollTop: number, scrollHeight: number): void {
+  if (isSyncingScroll || !editorRef.value?.editorView) return
+
+  // 简单的滚动同步基于百分比
+  const percentage = scrollHeight > 0 ? scrollTop / scrollHeight : 0
+
+  isSyncingScroll = true
+  // 这里可以实现编辑器的滚动同步
+  setTimeout(() => {
+    isSyncingScroll = false
+  }, 100)
+}
 </script>
 
 <template>
@@ -63,16 +87,31 @@ async function handleSave(): Promise<void> {
 
     <!-- 主编辑区域 -->
     <main class="main-content">
-      <MemoEditor
-        :model-value="fileStore.content"
-        :readonly="fileStore.fileMetadata?.isReadOnly ?? false"
-        @update:model-value="handleContentChange"
-        @save="handleSave"
-      />
+      <!-- 分栏布局容器 -->
+      <div :class="['split-view', `view-mode-${appStore.viewMode}`]">
+        <!-- 编辑器面板 -->
+        <div v-show="appStore.isEditorVisible" class="editor-panel">
+          <MemoEditor ref="editorRef" :model-value="fileStore.content"
+            :readonly="fileStore.fileMetadata?.isReadOnly ?? false" @update:model-value="handleContentChange"
+            @save="handleSave" />
+        </div>
+
+        <!-- 分隔条 -->
+        <div v-if="appStore.viewMode === 'split'" class="split-divider" />
+
+        <!-- 预览面板 -->
+        <div v-show="appStore.isPreviewVisible" class="preview-panel">
+          <MemoPreview ref="previewRef" :content="fileStore.content"
+            :theme="appStore.theme === 'dark' ? 'dark' : 'light'" @scroll="handlePreviewScroll" />
+        </div>
+      </div>
     </main>
 
     <!-- 状态栏 -->
     <StatusBar />
+
+    <!-- 设置模态框 -->
+    <SettingsModal v-if="appStore.isSettingsOpen" @close="appStore.closeSettings()" />
   </div>
 </template>
 
@@ -89,5 +128,79 @@ async function handleSave(): Promise<void> {
   min-height: 0;
   display: flex;
   padding: 0 16px 16px;
+}
+
+/* ========== 分栏布局 ========== */
+.split-view {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  min-height: 0;
+}
+
+.editor-panel,
+.preview-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+/* 视图模式：仅编辑 */
+.view-mode-edit .editor-panel {
+  flex: 1;
+}
+
+.view-mode-edit .preview-panel {
+  display: none;
+}
+
+/* 视图模式：仅预览 */
+.view-mode-preview .editor-panel {
+  display: none;
+}
+
+.view-mode-preview .preview-panel {
+  flex: 1;
+}
+
+/* 视图模式：分栏 */
+.view-mode-split .editor-panel,
+.view-mode-split .preview-panel {
+  flex: 1;
+}
+
+/* 分隔条 */
+.split-divider {
+  width: 1px;
+  background: linear-gradient(180deg,
+      transparent 0%,
+      var(--color-border, rgba(255, 255, 255, 0.1)) 20%,
+      var(--color-accent, #00ff88) 50%,
+      var(--color-border, rgba(255, 255, 255, 0.1)) 80%,
+      transparent 100%);
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
+
+.split-divider:hover {
+  opacity: 1;
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 768px) {
+  .split-view {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .split-divider {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        var(--color-accent, #00ff88) 50%,
+        transparent 100%);
+  }
 }
 </style>

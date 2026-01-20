@@ -13,14 +13,14 @@
  * 【鸿蒙迁移指南】
  * 迁移时只需：
  * 1. 创建 src/platforms/harmony/ 目录
- * 2. 实现 HarmonyFileSystem, HarmonySystemMenu
+ * 2. 实现 HarmonyFileSystem, HarmonySystemMenu, HarmonyConfigService
  * 3. 修改此文件的 getPlatform 逻辑，返回鸿蒙实现
  *
  * 全部业务代码自动适配，无需任何修改！
  */
 
-import type { IFileSystem, ISystemMenu } from '@/common/types'
-import { WindowsFileSystem, WindowsSystemMenu } from './windows'
+import type { IConfigService, IFileSystem, ISystemMenu } from '@/common/types'
+import { WindowsConfigService, WindowsFileSystem, WindowsSystemMenu } from './windows'
 
 /**
  * 支持的平台枚举
@@ -33,6 +33,7 @@ export type Platform = 'windows' | 'harmony' | 'web'
 export interface PlatformServices {
     fileSystem: IFileSystem
     systemMenu: ISystemMenu
+    configService: IConfigService
 }
 
 // 单例实例缓存
@@ -79,6 +80,7 @@ export function usePlatformServices(): PlatformServices {
             platformServicesInstance = {
                 fileSystem: new WindowsFileSystem(),
                 systemMenu: new WindowsSystemMenu(),
+                configService: new WindowsConfigService(),
             }
             break
 
@@ -86,7 +88,8 @@ export function usePlatformServices(): PlatformServices {
             // TODO: 鸿蒙实现
             // platformServicesInstance = {
             //   fileSystem: new HarmonyFileSystem(),
-            //   systemMenu: new HarmonySystemMenu()
+            //   systemMenu: new HarmonySystemMenu(),
+            //   configService: new HarmonyConfigService()
             // }
             throw new Error('鸿蒙平台尚未实现')
 
@@ -95,6 +98,7 @@ export function usePlatformServices(): PlatformServices {
             platformServicesInstance = {
                 fileSystem: new WindowsFileSystem(), // 暂用 Mock
                 systemMenu: new WindowsSystemMenu(),
+                configService: new WindowsConfigService(),
             }
             break
 
@@ -117,4 +121,11 @@ export function useFileSystem(): IFileSystem {
  */
 export function useSystemMenu(): ISystemMenu {
     return usePlatformServices().systemMenu
+}
+
+/**
+ * 便捷访问：获取配置服务
+ */
+export function useConfigService(): IConfigService {
+    return usePlatformServices().configService
 }

@@ -5,6 +5,7 @@
  * 所有跨平台接口从此处导出，业务层统一引用。
  */
 
+export * from './config'
 export * from './filesystem'
 export * from './system-menu'
 

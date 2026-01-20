@@ -2,11 +2,11 @@
 <!--
   🎯 标题栏组件
 
-  显示文件名和保存状态指示器
+  显示文件名、保存状态、视图切换按钮和设置入口
   在 Electron 中可配置为自定义窗口拖拽区域
 -->
 <script setup lang="ts">
-import type { SaveStatus } from '@/stores'
+import type { SaveStatus, ViewMode } from '@/stores'
 import { useAppStore, useFileStore } from '@/stores'
 import { computed } from 'vue'
 
@@ -17,6 +17,7 @@ const appStore = useAppStore()
 const fileName = computed(() => fileStore.currentFileName)
 const saveStatus = computed(() => fileStore.saveStatus)
 const hasUnsavedChanges = computed(() => fileStore.hasUnsavedChanges)
+const currentViewMode = computed(() => appStore.viewMode)
 
 // 状态指示器配置
 const statusConfig: Record<SaveStatus, { icon: string; text: string; class: string }> = {
@@ -24,6 +25,13 @@ const statusConfig: Record<SaveStatus, { icon: string; text: string; class: stri
   unsaved: { icon: '●', text: '未保存', class: 'status-unsaved' },
   saving: { icon: '↻', text: '保存中...', class: 'status-saving' },
   error: { icon: '✕', text: '保存失败', class: 'status-error' },
+}
+
+// 视图模式配置
+const viewModeConfig: Record<ViewMode, { icon: string; title: string }> = {
+  split: { icon: '⬚', title: '分栏视图 (当前)' },
+  edit: { icon: '✏️', title: '仅编辑器' },
+  preview: { icon: '👁️', title: '仅预览' },
 }
 
 const currentStatus = computed(() => statusConfig[saveStatus.value])
@@ -44,6 +52,14 @@ function handleSave(): void {
 function handleToggleTheme(): void {
   appStore.toggleTheme()
 }
+
+function handleCycleViewMode(): void {
+  appStore.cycleViewMode()
+}
+
+function handleOpenSettings(): void {
+  appStore.openSettings()
+}
 </script>
 
 <template>
@@ -62,12 +78,7 @@ function handleToggleTheme(): void {
         <button class="menu-btn" title="打开 (Ctrl+O)" @click="handleOpenFile">
           <span class="icon">📂</span>
         </button>
-        <button
-          class="menu-btn"
-          title="保存 (Ctrl+S)"
-          :disabled="!hasUnsavedChanges"
-          @click="handleSave"
-        >
+        <button class="menu-btn" title="保存 (Ctrl+S)" :disabled="!hasUnsavedChanges" @click="handleSave">
           <span class="icon">💾</span>
         </button>
       </nav>
@@ -79,8 +90,19 @@ function handleToggleTheme(): void {
       <span v-if="hasUnsavedChanges" class="unsaved-dot">●</span>
     </div>
 
-    <!-- 右侧：状态指示器和设置 -->
+    <!-- 右侧：视图切换、状态指示器和设置 -->
     <div class="title-bar__right">
+      <!-- 视图模式切换 -->
+      <div class="view-mode-switcher">
+        <button v-for="(config, mode) in viewModeConfig" :key="mode"
+          :class="['view-btn', { active: currentViewMode === mode }]" :title="config.title"
+          @click="appStore.setViewMode(mode as ViewMode)">
+          {{ config.icon }}
+        </button>
+      </div>
+
+      <div class="divider" />
+
       <div :class="['save-status', currentStatus.class]">
         <span class="status-icon">{{ currentStatus.icon }}</span>
         <span class="status-text">{{ currentStatus.text }}</span>
@@ -89,6 +111,8 @@ function handleToggleTheme(): void {
       <button class="theme-toggle" title="切换主题" @click="handleToggleTheme">
         {{ appStore.theme === 'dark' ? '🌙' : '☀️' }}
       </button>
+
+      <button class="settings-btn" title="设置" @click="handleOpenSettings">⚙️</button>
     </div>
   </header>
 </template>
@@ -103,7 +127,8 @@ function handleToggleTheme(): void {
   background: linear-gradient(135deg, rgba(30, 30, 46, 0.95), rgba(24, 24, 37, 0.95));
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   user-select: none;
-  -webkit-app-region: drag; /* Electron 窗口拖拽 */
+  -webkit-app-region: drag;
+  /* Electron 窗口拖拽 */
 }
 
 .title-bar__left,
@@ -190,13 +215,54 @@ function handleToggleTheme(): void {
 }
 
 @keyframes pulse {
+
   0%,
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
+}
+
+/* 视图模式切换器 */
+.view-mode-switcher {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.view-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.view-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.view-btn.active {
+  background: rgba(0, 255, 136, 0.2);
+  color: #00ff88;
+}
+
+/* 分隔线 */
+.divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* 保存状态 */
@@ -237,6 +303,7 @@ function handleToggleTheme(): void {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -248,7 +315,8 @@ function handleToggleTheme(): void {
 }
 
 /* 主题切换按钮 */
-.theme-toggle {
+.theme-toggle,
+.settings-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -262,8 +330,13 @@ function handleToggleTheme(): void {
   font-size: 16px;
 }
 
-.theme-toggle:hover {
+.theme-toggle:hover,
+.settings-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   transform: rotate(15deg);
+}
+
+.settings-btn:hover {
+  transform: rotate(45deg);
 }
 </style>

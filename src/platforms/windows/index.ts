@@ -6,6 +6,7 @@
  * 业务层通过平台 Adapter 使用这些实现，不直接导入。
  */
 
+export { WindowsConfigService } from './WindowsConfigService'
 export { WindowsFileSystem } from './WindowsFileSystem'
 export { WindowsSystemMenu } from './WindowsSystemMenu'
 

@@ -90,3 +90,11 @@ secrets/
 oh_modules/
 .cxx/
 local.properties
+
+# ========== 测试文件 ==========
+test/
+!test/.gitkeep
+
+# ========== 应用数据目录 ==========
+data/
+

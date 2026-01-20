@@ -23,6 +23,11 @@ files:
 asarUnpack:
   - '**/*.node'
 
+# 额外资源（复制到安装目录）
+extraResources:
+  - from: public/icon.ico
+    to: icon.ico
+
 # ==================== Windows 配置 ====================
 win:
   target:
@@ -34,6 +39,8 @@ win:
         - x64
   icon: public/icon.ico
   artifactName: '${productName}-${arch}.${ext}'
+  # 请求管理员权限（用于注册表操作）
+  requestedExecutionLevel: asInvoker
 
 # NSIS 安装程序配置
 nsis:
@@ -44,6 +51,12 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: 0xNote
+  # 包含自定义安装脚本
+  include: build/installer.nsh
+  # 安装语言
+  installerLanguages:
+    - zh_CN
+    - en_US
 
 # ==================== macOS 配置 ====================
 mac:

@@ -2,22 +2,33 @@
 /**
  * 🎛️ 应用全局状态 Store
  *
- * 管理应用级别的状态，如主题、启动参数等。
+ * 管理应用级别的状态，如主题、启动参数、视图模式等。
  */
 
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 /**
  * 主题类型
  */
 export type ThemeMode = 'light' | 'dark' | 'system'
 
+/**
+ * 视图模式类型
+ * - edit: 仅显示编辑器
+ * - preview: 仅显示预览
+ * - split: 分栏显示（编辑器 + 预览）
+ */
+export type ViewMode = 'edit' | 'preview' | 'split'
+
 export const useAppStore = defineStore('app', () => {
     // ========== 状态 ==========
 
     /** 当前主题 */
     const theme = ref<ThemeMode>('dark')
+
+    /** 视图模式 */
+    const viewMode = ref<ViewMode>('split')
 
     /** 应用是否已初始化 */
     const isInitialized = ref(false)
@@ -28,8 +39,14 @@ export const useAppStore = defineStore('app', () => {
     /** 侧边栏是否显示 */
     const isSidebarVisible = ref(false)
 
-    /** 是否显示预览面板 */
-    const isPreviewVisible = ref(true)
+    /** 是否显示预览面板（兼容旧代码） */
+    const isPreviewVisible = computed(() => viewMode.value !== 'edit')
+
+    /** 是否显示编辑器 */
+    const isEditorVisible = computed(() => viewMode.value !== 'preview')
+
+    /** 是否显示设置模态框 */
+    const isSettingsOpen = ref(false)
 
     // ========== 操作 ==========
 
@@ -40,6 +57,13 @@ export const useAppStore = defineStore('app', () => {
     function initialize(args: string[] = []): void {
         launchArgs.value = args
         isInitialized.value = true
+
+        // 从 localStorage 恢复视图模式
+        const savedViewMode = localStorage.getItem('0xNote:viewMode') as ViewMode | null
+        if (savedViewMode && ['edit', 'preview', 'split'].includes(savedViewMode)) {
+            viewMode.value = savedViewMode
+        }
+
         console.log('[AppStore] 应用初始化完成，启动参数:', args)
     }
 
@@ -81,10 +105,52 @@ export const useAppStore = defineStore('app', () => {
     }
 
     /**
-     * 切换预览面板
+     * 切换预览面板（兼容旧代码）
      */
     function togglePreview(): void {
-        isPreviewVisible.value = !isPreviewVisible.value
+        if (viewMode.value === 'split') {
+            viewMode.value = 'edit'
+        } else if (viewMode.value === 'edit') {
+            viewMode.value = 'split'
+        } else {
+            viewMode.value = 'split'
+        }
+        localStorage.setItem('0xNote:viewMode', viewMode.value)
+    }
+
+    /**
+     * 设置视图模式
+     */
+    function setViewMode(mode: ViewMode): void {
+        viewMode.value = mode
+        localStorage.setItem('0xNote:viewMode', mode)
+    }
+
+    /**
+     * 循环切换视图模式
+     */
+    function cycleViewMode(): void {
+        const modes: ViewMode[] = ['split', 'edit', 'preview']
+        const currentIndex = modes.indexOf(viewMode.value)
+        const nextIndex = (currentIndex + 1) % modes.length
+        const nextMode = modes[nextIndex]
+        if (nextMode) {
+            setViewMode(nextMode)
+        }
+    }
+
+    /**
+     * 打开设置
+     */
+    function openSettings(): void {
+        isSettingsOpen.value = true
+    }
+
+    /**
+     * 关闭设置
+     */
+    function closeSettings(): void {
+        isSettingsOpen.value = false
     }
 
     /**
@@ -92,7 +158,7 @@ export const useAppStore = defineStore('app', () => {
      */
     function getLaunchFilePath(): string | null {
         // 通常第一个参数是可执行文件路径，第二个开始是用户参数
-        // 如: ["0xNote.exe", "C:\Users\xxx\note.md"]
+        // 如: ["0xNote.exe", "C:\\Users\\xxx\\note.md"]
         const filePath = launchArgs.value.find((arg) => arg.endsWith('.md'))
         return filePath ?? null
     }
@@ -100,10 +166,13 @@ export const useAppStore = defineStore('app', () => {
     return {
         // State
         theme,
+        viewMode,
         isInitialized,
         launchArgs,
         isSidebarVisible,
         isPreviewVisible,
+        isEditorVisible,
+        isSettingsOpen,
 
         // Actions
         initialize,
@@ -112,6 +181,10 @@ export const useAppStore = defineStore('app', () => {
         applyTheme,
         toggleSidebar,
         togglePreview,
+        setViewMode,
+        cycleViewMode,
+        openSettings,
+        closeSettings,
         getLaunchFilePath,
     }
 })
