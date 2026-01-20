@@ -1,0 +1,92 @@
+# ==========================================
+# 🚀 0xNote .gitignore
+# ==========================================
+
+# ========== 依赖 ==========
+node_modules/
+.pnpm-store/
+
+# ========== 构建产物 ==========
+dist/
+dist-ssr/
+out/
+release/
+*.exe
+*.msi
+*.dmg
+*.zip
+*.AppImage
+*.snap
+
+# ========== Electron ==========
+# Electron 打包产物
+release/
+build/
+dist-electron/
+*.asar
+
+# ========== 日志文件 ==========
+logs/
+*.log
+build_log.txt
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ========== 缓存 ==========
+.cache/
+.temp/
+.tmp/
+*.tsbuildinfo
+.eslintcache
+.prettiercache
+
+# ========== 系统文件 ==========
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.local
+
+# ========== 编辑器 / IDE ==========
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ========== 测试覆盖率 ==========
+coverage/
+.nyc_output/
+
+# ========== Cypress ==========
+/cypress/videos/
+/cypress/screenshots/
+
+# ========== Vitest ==========
+__screenshots__/
+
+# ========== 环境变量 ==========
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# ========== 敏感文件 ==========
+*.pem
+*.key
+*.cert
+secrets/
+
+# ========== HarmonyOS / OpenHarmony ==========
+.hvigor/
+.ohpm/
+oh_modules/
+.cxx/
+local.properties

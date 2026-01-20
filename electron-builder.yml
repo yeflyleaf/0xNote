@@ -1,0 +1,100 @@
+# electron-builder 配置文件
+# https://www.electron.build/configuration/configuration
+
+appId: com.0xnote.app
+productName: 0xNote
+copyright: Copyright © 2026 0xNote
+
+# 目录配置
+directories:
+  output: release
+  buildResources: public
+
+# 文件包含规则
+files:
+  - dist-electron/**/*
+  - dist/**/*
+  - '!**/*.map'
+  - '!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}'
+  - '!**/node_modules/.bin'
+  - '!**/*.ts'
+
+# 解压的 asar 文件（需要原生模块时使用）
+asarUnpack:
+  - '**/*.node'
+
+# ==================== Windows 配置 ====================
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  icon: public/icon.ico
+  artifactName: '${productName}-${arch}.${ext}'
+
+# NSIS 安装程序配置
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 0xNote
+
+# ==================== macOS 配置 ====================
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  icon: public/icon.icns
+  category: public.app-category.developer-tools
+  artifactName: '${productName}-${arch}.${ext}'
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+# ==================== Linux 配置 ====================
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  icon: public/icons
+  category: Development
+  artifactName: '${productName}-${arch}.${ext}'
+  mimeTypes:
+    - text/markdown
+    - text/x-markdown
+
+# 文件关联
+fileAssociations:
+  - ext: md
+    mimeType: text/markdown
+    name: Markdown
+    description: Markdown 文件
+    role: Editor
+  - ext: markdown
+    mimeType: text/markdown
+    name: Markdown
+    description: Markdown 文件
+    role: Editor
+
+# 发布配置（可选）
+publish:
+  provider: generic
+  url: ''
