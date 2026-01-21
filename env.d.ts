@@ -8,6 +8,9 @@ interface ElectronAPI {
         writeFile: (filePath: string, content: string) => Promise<FileOperationResult>
         exists: (filePath: string) => Promise<boolean>
         getMetadata: (filePath: string) => Promise<FileOperationResult<FileMetadata>>
+        watchFile: (filePath: string) => Promise<FileOperationResult<void>>
+        unwatchFile: (filePath: string) => Promise<FileOperationResult<void>>
+        onFileChanged: (callback: (filePath: string, content: string) => void) => void
     }
     dialog: {
         openFile: () => Promise<FileOperationResult<string>>

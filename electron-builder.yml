@@ -48,7 +48,7 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: false
-  createDesktopShortcut: true
+  createDesktopShortcut: false
   createStartMenuShortcut: true
   shortcutName: 0xNote
   # 包含自定义安装脚本
@@ -99,12 +99,12 @@ fileAssociations:
   - ext: md
     mimeType: text/markdown
     name: Markdown
-    description: Markdown 文件
+    description: Markdown 文档
     role: Editor
   - ext: markdown
     mimeType: text/markdown
     name: Markdown
-    description: Markdown 文件
+    description: Markdown 文档
     role: Editor
 
 # 发布配置（可选）

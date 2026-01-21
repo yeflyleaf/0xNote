@@ -1,40 +1,120 @@
 ; electron/installer.nsh
 ; 0xNote NSIS 自定义安装脚本
-;
-; 【功能】
-; 1. 安装时注册 Windows 右键菜单和文件关联
-; 2. 卸载时清理注册表
-;
-; 【调用方式】
-; electron-builder 会在打包时自动调用此脚本
+; 实现：欢迎页 -> 组件选择页 -> 安装目录 -> 安装 -> 完成
 
 !include "MUI2.nsh"
-!include "FileFunc.nsh"
+!include "nsDialogs.nsh"
+!include "LogicLib.nsh"
+
+; ========== 变量定义 ==========
+Var Dialog
+Var CheckboxDesktop
+Var CheckboxContextMenu
+Var CreateDesktopShortcut
+Var AddContextMenu
+
+; ========== 自定义页面：组件选择 ==========
+Function ComponentsPage
+  !insertmacro MUI_HEADER_TEXT "选择组件" "选择您想要安装的可选组件。"
+  
+  nsDialogs::Create 1018
+  Pop $Dialog
+  
+  ${If} $Dialog == error
+    Abort
+  ${EndIf}
+  
+  ; 创建说明文本
+  ${NSD_CreateLabel} 0 0 100% 24u "请选择要安装的可选组件："
+  Pop $0
+  
+  ; 创建复选框：桌面快捷方式（默认选中）
+  ${NSD_CreateCheckbox} 0 30u 100% 12u "创建桌面快捷方式"
+  Pop $CheckboxDesktop
+  ${NSD_Check} $CheckboxDesktop
+  
+  ; 创建复选框：右键菜单（默认选中）
+  ${NSD_CreateCheckbox} 0 48u 100% 12u "添加右键菜单功能（新建 Markdown 文档）"
+  Pop $CheckboxContextMenu
+  ${NSD_Check} $CheckboxContextMenu
+  
+  ; 说明文本
+  ${NSD_CreateLabel} 0 72u 100% 36u "提示：$\r$\n• 桌面快捷方式可在桌面快速启动 0xNote$\r$\n• 右键菜单可在文件资源管理器中快速新建 Markdown 文档"
+  Pop $0
+  
+  nsDialogs::Show
+FunctionEnd
+
+; 保存用户选择
+Function ComponentsPageLeave
+  ${NSD_GetState} $CheckboxDesktop $CreateDesktopShortcut
+  ${NSD_GetState} $CheckboxContextMenu $AddContextMenu
+FunctionEnd
+
+; ========== 注册自定义页面 ==========
+!macro customHeader
+  ; 在欢迎页之后插入组件选择页
+  Page custom ComponentsPage ComponentsPageLeave
+!macroend
 
 ; ========== 安装时执行 ==========
 !macro customInstall
-  ; 调用应用程序注册 Windows 集成
-  ; --register 参数会触发静默注册模式
-  DetailPrint "正在注册 Windows 集成..."
-  nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --register'
-  Pop $0
-  ${If} $0 != 0
-    DetailPrint "Windows 集成注册可能需要管理员权限，请在首次启动时手动注册"
+  ; 1. 根据用户选择创建桌面快捷方式
+  ${If} $CreateDesktopShortcut == ${BST_CHECKED}
+    DetailPrint "正在创建桌面快捷方式..."
+    CreateShortCut "$DESKTOP\${APP_FILENAME}.lnk" "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+  ${Else}
+    DetailPrint "跳过创建桌面快捷方式"
+  ${EndIf}
+
+  ; 2. 根据用户选择注册右键菜单
+  ${If} $AddContextMenu == ${BST_CHECKED}
+    DetailPrint "正在注册 Windows 集成..."
+    nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --register'
+  ${Else}
+    DetailPrint "跳过注册 Windows 集成"
   ${EndIf}
 !macroend
 
 ; ========== 卸载时执行 ==========
 !macro customUnInstall
-  ; 调用应用程序注销 Windows 集成
+  ; 调用应用程序注销 Windows 集成（首选方式）
   DetailPrint "正在移除 Windows 集成..."
   nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --unregister'
   
-  ; 备用方案：直接删除注册表项（用户级别）
-  DeleteRegKey HKCU "Software\Classes\.md"
-  DeleteRegKey HKCU "Software\Classes\0xNote.MarkdownFile"
-  DeleteRegKey HKCU "Software\Classes\Directory\Background\shell\0xNote"
-  DeleteRegKey HKCU "Software\Classes\Directory\shell\0xNote"
+  ; ========== 精确清理注册表（仅删除 0xNote 添加的内容） ==========
+  ; 注意：不删除 .md 整个键，避免影响其他程序的文件关联
   
-  ; 清理应用数据目录（可选）
-  ; RMDir /r "$INSTDIR\data"
+  ; 1. 只删除 ShellNew 子键（右键 -> 新建 -> Markdown 文档）
+  DetailPrint "清理新建菜单项..."
+  nsExec::ExecToLog 'reg delete "HKCU\Software\Classes\.md\ShellNew" /f'
+  nsExec::ExecToLog 'reg delete "HKCR\.md\ShellNew" /f'
+  
+  ; 2. 删除 0xNote 的文件类型定义（这是我们自己创建的，可以安全删除）
+  DetailPrint "清理文件类型定义..."
+  nsExec::ExecToLog 'reg delete "HKCU\Software\Classes\0xNote.md" /f'
+  nsExec::ExecToLog 'reg delete "HKCR\0xNote.md" /f'
+  
+  ; 3. 清理旧版目录右键菜单（如果有残留）
+  nsExec::ExecToLog 'reg delete "HKCU\Software\Classes\Directory\Background\shell\0xNote" /f'
+  nsExec::ExecToLog 'reg delete "HKCU\Software\Classes\Directory\shell\0xNote" /f'
+  nsExec::ExecToLog 'reg delete "HKCR\Directory\Background\shell\0xNote" /f'
+  nsExec::ExecToLog 'reg delete "HKCR\Directory\shell\0xNote" /f'
+  
+  ; 4. 如果 .md 的默认值是 0xNote.md，则清除它（但不删除整个键）
+  ; 这样其他程序的关联不会受影响
+  nsExec::ExecToLog 'reg query "HKCU\Software\Classes\.md" /ve | findstr "0xNote.md" && reg delete "HKCU\Software\Classes\.md" /ve /f'
+  
+  ; 5. 刷新 Shell 图标缓存
+  DetailPrint "刷新系统缓存..."
+  nsExec::ExecToLog 'ie4uinit.exe -show'
+  
+  ; 6. 删除桌面快捷方式
+  DetailPrint "删除快捷方式..."
+  Delete "$DESKTOP\${APP_FILENAME}.lnk"
+  Delete "$SMPROGRAMS\${APP_FILENAME}.lnk"
+  
+  DetailPrint "卸载清理完成"
 !macroend
+
+

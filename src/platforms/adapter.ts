@@ -9,14 +9,6 @@
  * 【工作原理】
  * 1. 检测当前运行平台
  * 2. 返回对应平台的接口实现实例
- *
- * 【鸿蒙迁移指南】
- * 迁移时只需：
- * 1. 创建 src/platforms/harmony/ 目录
- * 2. 实现 HarmonyFileSystem, HarmonySystemMenu, HarmonyConfigService
- * 3. 修改此文件的 getPlatform 逻辑，返回鸿蒙实现
- *
- * 全部业务代码自动适配，无需任何修改！
  */
 
 import type { IConfigService, IFileSystem, ISystemMenu } from '@/common/types'
@@ -25,7 +17,7 @@ import { WindowsConfigService, WindowsFileSystem, WindowsSystemMenu } from './wi
 /**
  * 支持的平台枚举
  */
-export type Platform = 'windows' | 'harmony' | 'web'
+export type Platform = 'windows' | 'web'
 
 /**
  * 平台实现集合
@@ -47,9 +39,6 @@ export function detectPlatform(): Platform {
     if (typeof window !== 'undefined' && (window as unknown as { electron?: unknown }).electron) {
         return 'windows'
     }
-
-    // TODO: 检测鸿蒙环境
-    // if (typeof ohosEnv !== 'undefined') return 'harmony'
 
     // 默认返回 web（开发模式）
     // 注意：在纯 Web 环境下，文件系统等功能受限
@@ -83,15 +72,6 @@ export function usePlatformServices(): PlatformServices {
                 configService: new WindowsConfigService(),
             }
             break
-
-        case 'harmony':
-            // TODO: 鸿蒙实现
-            // platformServicesInstance = {
-            //   fileSystem: new HarmonyFileSystem(),
-            //   systemMenu: new HarmonySystemMenu(),
-            //   configService: new HarmonyConfigService()
-            // }
-            throw new Error('鸿蒙平台尚未实现')
 
         case 'web':
             // Web 模式使用受限的实现

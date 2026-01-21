@@ -193,7 +193,7 @@ if (isRegisterMode || isUnregisterMode) {
    */
   ipcMain.handle('dialog:openFile', async () => {
     const result = await dialog.showOpenDialog(mainWindow!, {
-      title: '打开 Markdown 文件',
+      title: '打开 Markdown 文档',
       filters: [
         { name: 'Markdown', extensions: ['md', 'markdown'] },
         { name: '所有文件', extensions: ['*'] },
@@ -212,7 +212,7 @@ if (isRegisterMode || isUnregisterMode) {
    */
   ipcMain.handle('dialog:saveFile', async (_event, defaultFileName: string) => {
     const result = await dialog.showSaveDialog(mainWindow!, {
-      title: '保存 Markdown 文件',
+      title: '保存 Markdown 文档',
       defaultPath: defaultFileName,
       filters: [
         { name: 'Markdown', extensions: ['md'] },
