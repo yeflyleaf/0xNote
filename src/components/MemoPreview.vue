@@ -82,7 +82,7 @@ const previewStyles = computed(() => {
   return {
     ...cssVars,
     fontSize: `${settingStore.settings.fontSize}px`,
-    fontFamily: settingStore.settings.fontFamily,
+    fontFamily: settingStore.settings.previewFontFamily,
   }
 })
 
@@ -156,8 +156,16 @@ defineExpose({
 </script>
 
 <template>
-  <div :class="['memo-preview', { 'theme-dark': isDarkTheme, 'theme-light': !isDarkTheme }]" :style="previewStyles">
-    <div ref="previewContainer" class="preview-container markdown-body" @scroll="handleScroll" v-html="renderedHtml" />
+  <div
+    :class="['memo-preview', { 'theme-dark': isDarkTheme, 'theme-light': !isDarkTheme }]"
+    :style="previewStyles"
+  >
+    <div
+      ref="previewContainer"
+      class="preview-container markdown-body"
+      @scroll="handleScroll"
+      v-html="renderedHtml"
+    />
   </div>
 </template>
 
@@ -183,7 +191,7 @@ defineExpose({
 /* ========== Markdown 渲染样式（使用 CSS 变量） ========== */
 .markdown-body {
   color: var(--preview-text, #cdd6f4);
-  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-family: inherit;
   line-height: 1.8;
   transition: color 1s ease;
 }

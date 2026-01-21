@@ -30,14 +30,16 @@ const appStore = useAppStore()
 // 本地编辑的设置副本（用于实时预览）
 const localSettings = reactive<AppSettings>({ ...DEFAULT_SETTINGS })
 
-// 可选的字体家族列表
-const fontFamilyOptions = [
-  { value: "'JetBrains Mono', 'Fira Code', Consolas, monospace", label: 'JetBrains Mono' },
-  { value: "'Fira Code', Consolas, monospace", label: 'Fira Code' },
-  { value: "'Source Code Pro', Consolas, monospace", label: 'Source Code Pro' },
-  { value: "Consolas, 'Courier New', monospace", label: 'Consolas' },
-  { value: "'Cascadia Code', Consolas, monospace", label: 'Cascadia Code' },
-  { value: "'Microsoft YaHei', sans-serif", label: '微软雅黑' },
+// 预览字体选项
+// 预览字体选项
+const previewFontOptions = [
+  { label: '微软雅黑 (默认)', value: "'Microsoft YaHei', '微软雅黑', sans-serif" },
+  { label: '宋体', value: "'SimSun', '宋体', serif" },
+  { label: '黑体', value: "'SimHei', '黑体', sans-serif" },
+  { label: '楷体', value: "'KaiTi', '楷体', serif" },
+  { label: 'Arial', value: 'Arial, sans-serif' },
+  { label: 'Times New Roman', value: "'Times New Roman', serif" },
+  { label: 'Helvetica', value: 'Helvetica, sans-serif' },
 ]
 
 // 编辑器主题选项（从主题定义中生成）
@@ -84,6 +86,20 @@ watch(
   },
 )
 
+// 监听字体变化，实时预览
+watch(
+  [
+    () => localSettings.fontFamily,
+    () => localSettings.previewFontFamily,
+    () => localSettings.fontSize,
+  ],
+  ([newFont, newPreviewFont, newSize]) => {
+    settingStore.settings.fontFamily = newFont
+    settingStore.settings.previewFontFamily = newPreviewFont
+    settingStore.settings.fontSize = newSize
+  },
+)
+
 // ========== 操作方法 ==========
 
 /**
@@ -102,6 +118,9 @@ async function handleSave(): Promise<void> {
 function handleCancel(): void {
   // 恢复之前的主题
   appStore.setTheme(settingStore.settings.theme === 'system' ? 'dark' : settingStore.settings.theme)
+  // 恢复之前的设置 (因为 watch 实时修改了 store)
+  // 重新加载设置以恢复
+  settingStore.loadSettings()
   emit('close')
 }
 
@@ -210,14 +229,16 @@ function handleKeydown(event: KeyboardEvent): void {
               </div>
             </div>
 
-            <!-- 字体家族 -->
+            <!-- 预览字体 -->
             <div class="setting-item">
-              <label class="setting-label">字体</label>
-              <select v-model="localSettings.fontFamily" class="select-input">
-                <option v-for="option in fontFamilyOptions" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
+              <label class="setting-label">预览字体</label>
+              <div class="font-selector">
+                <select v-model="localSettings.previewFontFamily" class="select-input">
+                  <option v-for="option in previewFontOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </div>
             </div>
           </section>
 
@@ -730,5 +751,36 @@ function handleKeydown(event: KeyboardEvent): void {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+/* ========== 字体选择器 ========== */
+.font-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.text-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  color: var(--color-text-primary, #cdd6f4);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.text-input:hover {
+  border-color: rgba(0, 255, 136, 0.3);
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: var(--color-accent, #00ff88);
+}
+
+.text-input::placeholder {
+  color: var(--color-text-muted, #6c7086);
 }
 </style>

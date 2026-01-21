@@ -36,6 +36,8 @@ export interface AppSettings {
   tabSize: number
   /** 预览同步滚动 */
   syncScroll: boolean
+  /** 预览字体家族 */
+  previewFontFamily: string
 }
 
 /**
@@ -43,7 +45,8 @@ export interface AppSettings {
  */
 export const DEFAULT_SETTINGS: AppSettings = {
   fontSize: 14,
-  fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+  fontFamily: "'Microsoft YaHei', '微软雅黑', Consolas, monospace",
+  previewFontFamily: "'Microsoft YaHei', '微软雅黑', sans-serif",
   theme: 'dark',
   editorTheme: 'dark-neon',
   preferredDarkTheme: 'dark-neon',
