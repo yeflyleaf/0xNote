@@ -71,24 +71,6 @@
 | 桌面框架      | Electron                | 35+        |
 | 安装打包      | electron-builder + NSIS | 26+        |
 
-### 克隆与启动
-
-```bash
-# 克隆项目
-git clone https://github.com/your-repo/0xNote.git
-
-# 进入项目目录
-cd 0xNote
-
-# 安装依赖
-npm install
-
-# 启动 Electron 开发模式（推荐）
-npm run electron:dev
-```
-
-构建产物输出到 `release/` 目录。
-
 ---
 
 ## 📁 项目结构
@@ -124,6 +106,32 @@ npm run electron:dev
 │
 └── release/                   # 构建产物
 ```
+
+---
+
+## 🚀 快速开始 (Getting Started)
+
+### 克隆项目
+```bash
+git clone https://github.com/your-repo/0xNote.git
+```
+
+### 进入项目目录
+```bash
+cd 0xNote
+```
+
+### 安装依赖
+```bash
+npm install
+```
+
+### 启动 Electron 开发模式（推荐）
+```bash
+npm run electron:dev
+```
+
+构建产物输出到 `release/` 目录。
 
 ---
 
