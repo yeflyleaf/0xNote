@@ -48,6 +48,8 @@ nsis:
   createDesktopShortcut: false
   createStartMenuShortcut: true
   shortcutName: 0xNote
+  # 卸载名称不带版本号
+  uninstallDisplayName: ${productName}
   # 包含自定义安装脚本
   include: electron/installer.nsh
   # NSIS 安装包命名（用于 GitHub Release）
@@ -97,12 +99,13 @@ linux:
 fileAssociations:
   - ext: md
     mimeType: text/markdown
-    name: Markdown
+    name: 0xNote.Markdown
     description: Markdown 文档
     role: Editor
+
   - ext: markdown
     mimeType: text/markdown
-    name: Markdown
+    name: 0xNote.Markdown
     description: Markdown 文档
     role: Editor
 

@@ -59,6 +59,8 @@ FunctionEnd
   Page custom ComponentsPage ComponentsPageLeave
 !macroend
 
+
+
 !endif ; BUILD_UNINSTALLER
 
 ; ========== 安装时执行 ==========
@@ -86,34 +88,38 @@ FunctionEnd
   DetailPrint "正在移除 Windows 集成..."
   nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --unregister'
   
-  ; ========== 精确清理注册表（仅删除 0xNote 添加的内容） ==========
-  ; 注意：不删除 .md 整个键，避免影响其他程序的文件关联
+  ; ========== 精确清理注册表 ==========
   
-  ; 1. 只删除 ShellNew 子键（右键 -> 新建 -> Markdown 文档）
+  ; 1. 清理 ShellNew
   DetailPrint "清理新建菜单项..."
   nsExec::ExecToLog 'reg delete "HKCU\Software\Classes\.md\ShellNew" /f'
   nsExec::ExecToLog 'reg delete "HKCR\.md\ShellNew" /f'
   
-  ; 2. 删除 0xNote 的文件类型定义（这是我们自己创建的，可以安全删除）
+  ; 2. 清理 ProgID (0xNote.Markdown)
   DetailPrint "清理文件类型定义..."
+  nsExec::ExecToLog 'reg delete "HKCU\Software\Classes\0xNote.Markdown" /f'
+  nsExec::ExecToLog 'reg delete "HKCR\0xNote.Markdown" /f'
+  
+  ; 3. 清理旧版 ProgID (兼容旧版本)
   nsExec::ExecToLog 'reg delete "HKCU\Software\Classes\0xNote.md" /f'
   nsExec::ExecToLog 'reg delete "HKCR\0xNote.md" /f'
+  nsExec::ExecToLog 'reg delete "HKCU\Software\Classes\Markdown" /f'
   
-  ; 3. 清理旧版目录右键菜单（如果有残留）
+  ; 4. 清理目录右键菜单
   nsExec::ExecToLog 'reg delete "HKCU\Software\Classes\Directory\Background\shell\0xNote" /f'
   nsExec::ExecToLog 'reg delete "HKCU\Software\Classes\Directory\shell\0xNote" /f'
   nsExec::ExecToLog 'reg delete "HKCR\Directory\Background\shell\0xNote" /f'
   nsExec::ExecToLog 'reg delete "HKCR\Directory\shell\0xNote" /f'
   
-  ; 4. 如果 .md 的默认值是 0xNote.md，则清除它（但不删除整个键）
-  ; 这样其他程序的关联不会受影响
-  nsExec::ExecToLog 'reg query "HKCU\Software\Classes\.md" /ve | findstr "0xNote.md" && reg delete "HKCU\Software\Classes\.md" /ve /f'
+  ; 5. 如果 .md 默认值指向我们，则清除
+  nsExec::ExecToLog 'reg query "HKCU\Software\Classes\.md" /ve | findstr "0xNote.Markdown" && reg delete "HKCU\Software\Classes\.md" /ve /f'
   
-  ; 5. 刷新 Shell 图标缓存
+  ; 6. 刷新缓存
   DetailPrint "刷新系统缓存..."
   nsExec::ExecToLog 'ie4uinit.exe -show'
+  System::Call 'shell32::SHChangeNotify(i, i, i, i) v (0x08000000, 0, 0, 0)'
   
-  ; 6. 删除桌面快捷方式
+  ; 7. 删除桌面快捷方式
   DetailPrint "删除快捷方式..."
   Delete "$DESKTOP\${APP_FILENAME}.lnk"
   Delete "$SMPROGRAMS\${APP_FILENAME}.lnk"
