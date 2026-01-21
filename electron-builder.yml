@@ -52,7 +52,7 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: 0xNote
   # 包含自定义安装脚本
-  include: build/installer.nsh
+  include: electron/installer.nsh
   # 安装语言
   installerLanguages:
     - zh_CN
