@@ -291,6 +291,59 @@ if (isRegisterMode || isUnregisterMode) {
     return isRegistered()
   })
 
+  /**
+   * 监听文件变化
+   */
+  const activeWatchers = new Map<string, fs.FSWatcher>()
+
+  ipcMain.handle('fs:watchFile', (_event, filePath: string) => {
+    if (activeWatchers.has(filePath)) {
+      return { success: true }
+    }
+
+    try {
+      let fsWait: NodeJS.Timeout | null = null
+      const watcher = fs.watch(filePath, (eventType) => {
+        if (eventType === 'change') {
+          if (fsWait) return
+          fsWait = setTimeout(() => {
+            fsWait = null
+            fs.readFile(filePath, 'utf-8', (err, data) => {
+              if (!err && mainWindow) {
+                mainWindow.webContents.send('file:changed', { filePath, content: data })
+              }
+            })
+          }, 100)
+        }
+      })
+
+      // 处理错误，防止崩溃
+      watcher.on('error', (error) => {
+        console.error(`[Main] Watcher error for ${filePath}:`, error)
+        watcher.close()
+        activeWatchers.delete(filePath)
+      })
+
+      activeWatchers.set(filePath, watcher)
+      return { success: true }
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException
+      return { success: false, error: err.message }
+    }
+  })
+
+  /**
+   * 取消监听文件
+   */
+  ipcMain.handle('fs:unwatchFile', (_event, filePath: string) => {
+    const watcher = activeWatchers.get(filePath)
+    if (watcher) {
+      watcher.close()
+      activeWatchers.delete(filePath)
+    }
+    return { success: true }
+  })
+
   // ==================== 生命周期 ====================
 
   app.whenReady().then(async () => {

@@ -16,6 +16,20 @@ import type { FileMetadata, FileOperationResult, IFileSystem } from '@/common/ty
  */
 export class WindowsFileSystem implements IFileSystem {
     private readonly LOG_PREFIX = '[WindowsFileSystem]'
+    private fileChangeListeners = new Map<string, (content: string) => void>()
+
+    constructor() {
+        // 监听主进程的文件变化事件
+        if (typeof window !== 'undefined' && window.electron) {
+            window.electron.fs.onFileChanged((path, content) => {
+                const callback = this.fileChangeListeners.get(path)
+                if (callback) {
+                    console.log(`${this.LOG_PREFIX} 外部文件变化: ${path}`)
+                    callback(content)
+                }
+            })
+        }
+    }
 
     /**
      * 检查 Electron API 是否可用
@@ -127,6 +141,22 @@ export class WindowsFileSystem implements IFileSystem {
         return {
             success: false,
             error: 'Web 模式下无法打开保存对话框',
+        }
+    }
+
+    async watchFile(filePath: string, callback: (content: string) => void): Promise<void> {
+        console.log(`${this.LOG_PREFIX} watchFile: ${filePath}`)
+        if (this.isElectronEnv) {
+            this.fileChangeListeners.set(filePath, callback)
+            await this.electronAPI!.fs.watchFile(filePath)
+        }
+    }
+
+    async unwatchFile(filePath: string): Promise<void> {
+        console.log(`${this.LOG_PREFIX} unwatchFile: ${filePath}`)
+        if (this.isElectronEnv) {
+            this.fileChangeListeners.delete(filePath)
+            await this.electronAPI!.fs.unwatchFile(filePath)
         }
     }
 }

@@ -60,6 +60,8 @@ const emit = defineEmits<{
   ready: [view: EditorView]
   /** 保存事件 (Ctrl+S) */
   save: []
+  /** 滚动事件 */
+  scroll: [percentage: number]
 }>()
 
 // ========== Store ==========
@@ -185,6 +187,9 @@ onMounted(async () => {
 
   // 触发就绪事件
   emit('ready', editorView.value)
+
+  // 监听滚动事件
+  editorView.value.scrollDOM.addEventListener('scroll', handleScroll)
 })
 
 onUnmounted(() => {
@@ -202,6 +207,10 @@ watch(
 
     const currentContent = editorView.value.state.doc.toString()
     if (newValue !== currentContent) {
+      // 记录当前滚动位置
+      const scrollDOM = editorView.value.scrollDOM
+      const savedScrollTop = scrollDOM.scrollTop
+
       isInternalUpdate = true
       editorView.value.dispatch({
         changes: {
@@ -210,6 +219,14 @@ watch(
           insert: newValue,
         },
       })
+
+      // 恢复滚动位置 (使用 setTimeout 确保 DOM 更新后执行)
+      setTimeout(() => {
+        if (editorView.value) {
+          editorView.value.scrollDOM.scrollTop = savedScrollTop
+        }
+      }, 0)
+
       isInternalUpdate = false
     }
   },
@@ -291,11 +308,41 @@ function insertText(text: string): void {
   })
 }
 
+/**
+ * 处理滚动事件
+ */
+function handleScroll(e: Event): void {
+  const target = e.target as HTMLElement
+  if (!target) return
+
+  const { scrollTop, scrollHeight, clientHeight } = target
+  const maxScroll = scrollHeight - clientHeight
+  const percentage = maxScroll > 0 ? scrollTop / maxScroll : 0
+
+  emit('scroll', percentage)
+}
+
+/**
+ * 滚动到指定位置
+ * @param percentage 滚动百分比 (0-1)
+ */
+function scrollToPercentage(percentage: number): void {
+  if (!editorView.value) return
+
+  const scrollDOM = editorView.value.scrollDOM
+  const { scrollHeight, clientHeight } = scrollDOM
+  const maxScroll = scrollHeight - clientHeight
+
+  // 使用 scrollTo 以支持平滑滚动（如果需要）
+  scrollDOM.scrollTop = maxScroll * percentage
+}
+
 defineExpose({
   focus,
   getContent,
   insertText,
   editorView,
+  scrollToPercentage,
 })
 </script>
 

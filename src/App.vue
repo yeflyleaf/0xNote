@@ -11,11 +11,12 @@
 <script setup lang="ts">
 import { MemoEditor, MemoPreview, StatusBar, TitleBar } from '@/components'
 import SettingsModal from '@/components/SettingsModal.vue'
-import { useAppStore, useFileStore } from '@/stores'
+import { useAppStore, useFileStore, useSettingStore } from '@/stores'
 import { onMounted, ref } from 'vue'
 
 const fileStore = useFileStore()
 const appStore = useAppStore()
+const settingStore = useSettingStore()
 
 // 编辑器和预览组件引用（用于滚动同步）
 const editorRef = ref<InstanceType<typeof MemoEditor> | null>(null)
@@ -64,16 +65,32 @@ async function handleSave(): Promise<void> {
 }
 
 /**
- * 处理预览滚动事件（用于同步滚动）
+ * 处理编辑器滚动事件
  */
-function handlePreviewScroll(scrollTop: number, scrollHeight: number): void {
-  if (isSyncingScroll || !editorRef.value?.editorView) return
-
-  // 简单的滚动同步基于百分比
-  const percentage = scrollHeight > 0 ? scrollTop / scrollHeight : 0
+function handleEditorScroll(percentage: number): void {
+  if (!settingStore.settings.syncScroll) return
+  if (isSyncingScroll || !previewRef.value) return
 
   isSyncingScroll = true
-  // 这里可以实现编辑器的滚动同步
+  previewRef.value.scrollToPercentage(percentage)
+
+  // 解锁
+  setTimeout(() => {
+    isSyncingScroll = false
+  }, 100)
+}
+
+/**
+ * 处理预览滚动事件（用于同步滚动）
+ */
+function handlePreviewScroll(percentage: number): void {
+  if (!settingStore.settings.syncScroll) return
+  if (isSyncingScroll || !editorRef.value) return
+
+  isSyncingScroll = true
+  editorRef.value.scrollToPercentage(percentage)
+
+  // 解锁
   setTimeout(() => {
     isSyncingScroll = false
   }, 100)
@@ -91,13 +108,9 @@ function handlePreviewScroll(scrollTop: number, scrollHeight: number): void {
       <div :class="['split-view', `view-mode-${appStore.viewMode}`]">
         <!-- 编辑器面板 -->
         <div v-show="appStore.isEditorVisible" class="editor-panel">
-          <MemoEditor
-            ref="editorRef"
-            :model-value="fileStore.content"
-            :readonly="fileStore.fileMetadata?.isReadOnly ?? false"
-            @update:model-value="handleContentChange"
-            @save="handleSave"
-          />
+          <MemoEditor ref="editorRef" :model-value="fileStore.content"
+            :readonly="fileStore.fileMetadata?.isReadOnly ?? false" @update:model-value="handleContentChange"
+            @save="handleSave" @scroll="handleEditorScroll" />
         </div>
 
         <!-- 分隔条 -->
@@ -105,11 +118,7 @@ function handlePreviewScroll(scrollTop: number, scrollHeight: number): void {
 
         <!-- 预览面板 -->
         <div v-show="appStore.isPreviewVisible" class="preview-panel">
-          <MemoPreview
-            ref="previewRef"
-            :content="fileStore.content"
-            @scroll="handlePreviewScroll"
-          />
+          <MemoPreview ref="previewRef" :content="fileStore.content" @scroll="handlePreviewScroll" />
         </div>
       </div>
     </main>
@@ -180,14 +189,12 @@ function handlePreviewScroll(scrollTop: number, scrollHeight: number): void {
 /* 分隔条 */
 .split-divider {
   width: 1px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    var(--color-border, rgba(255, 255, 255, 0.1)) 20%,
-    var(--color-accent, #00ff88) 50%,
-    var(--color-border, rgba(255, 255, 255, 0.1)) 80%,
-    transparent 100%
-  );
+  background: linear-gradient(180deg,
+      transparent 0%,
+      var(--color-border, rgba(255, 255, 255, 0.1)) 20%,
+      var(--color-accent, #00ff88) 50%,
+      var(--color-border, rgba(255, 255, 255, 0.1)) 80%,
+      transparent 100%);
   opacity: 0.5;
   transition: opacity 0.2s ease;
 }
@@ -206,12 +213,10 @@ function handlePreviewScroll(scrollTop: number, scrollHeight: number): void {
   .split-divider {
     width: 100%;
     height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      var(--color-accent, #00ff88) 50%,
-      transparent 100%
-    );
+    background: linear-gradient(90deg,
+        transparent 0%,
+        var(--color-accent, #00ff88) 50%,
+        transparent 100%);
   }
 }
 </style>

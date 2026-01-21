@@ -19,6 +19,11 @@ const electronAPI = {
             ipcRenderer.invoke('fs:writeFile', filePath, content),
         exists: (filePath: string) => ipcRenderer.invoke('fs:exists', filePath),
         getMetadata: (filePath: string) => ipcRenderer.invoke('fs:getMetadata', filePath),
+        watchFile: (filePath: string) => ipcRenderer.invoke('fs:watchFile', filePath),
+        unwatchFile: (filePath: string) => ipcRenderer.invoke('fs:unwatchFile', filePath),
+        onFileChanged: (callback: (filePath: string, content: string) => void) => {
+            ipcRenderer.on('file:changed', (_event, data) => callback(data.filePath, data.content))
+        },
     },
 
     // ========== 对话框 ==========

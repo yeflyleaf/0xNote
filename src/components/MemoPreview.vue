@@ -40,7 +40,7 @@ const settingStore = useSettingStore()
  */
 const emit = defineEmits<{
   /** 滚动事件（用于同步滚动） */
-  scroll: [scrollTop: number, scrollHeight: number]
+  scroll: [percentage: number]
 }>()
 
 // ========== Markdown 解析器配置 ==========
@@ -133,8 +133,11 @@ watch(
 function handleScroll(): void {
   if (!previewContainer.value) return
 
-  const { scrollTop, scrollHeight } = previewContainer.value
-  emit('scroll', scrollTop, scrollHeight)
+  const { scrollTop, scrollHeight, clientHeight } = previewContainer.value
+  const maxScroll = scrollHeight - clientHeight
+  const percentage = maxScroll > 0 ? scrollTop / maxScroll : 0
+
+  emit('scroll', percentage)
 }
 
 /**
@@ -156,16 +159,8 @@ defineExpose({
 </script>
 
 <template>
-  <div
-    :class="['memo-preview', { 'theme-dark': isDarkTheme, 'theme-light': !isDarkTheme }]"
-    :style="previewStyles"
-  >
-    <div
-      ref="previewContainer"
-      class="preview-container markdown-body"
-      @scroll="handleScroll"
-      v-html="renderedHtml"
-    />
+  <div :class="['memo-preview', { 'theme-dark': isDarkTheme, 'theme-light': !isDarkTheme }]" :style="previewStyles">
+    <div ref="previewContainer" class="preview-container markdown-body" @scroll="handleScroll" v-html="renderedHtml" />
   </div>
 </template>
 

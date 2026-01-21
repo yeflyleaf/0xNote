@@ -16,6 +16,7 @@ import { useFileSystem } from '@/platforms/adapter'
 import { debounce } from 'lodash-es'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { useSettingStore } from './settingStore'
 
 /**
  * 保存状态枚举
@@ -23,232 +24,322 @@ import { computed, ref, watch } from 'vue'
 export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error'
 
 export const useFileStore = defineStore('file', () => {
-    // ========== 状态 (State) ==========
+  // ========== 状态 (State) ==========
 
-    /** 当前打开的文件路径 */
-    const currentFilePath = ref<string | null>(null)
+  const settingStore = useSettingStore()
 
-    /** 编辑器内容 */
-    const content = ref<string>('')
+  /** 当前打开的文件路径 */
+  const currentFilePath = ref<string | null>(null)
 
-    /** 原始内容（用于判断是否修改） */
-    const originalContent = ref<string>('')
+  /** 编辑器内容 */
+  const content = ref<string>('')
 
-    /** 文件元信息 */
-    const fileMetadata = ref<FileMetadata | null>(null)
+  /** 原始内容（用于判断是否修改） */
+  const originalContent = ref<string>('')
 
-    /** 保存状态 */
-    const saveStatus = ref<SaveStatus>('saved')
+  /** 文件元信息 */
+  const fileMetadata = ref<FileMetadata | null>(null)
 
-    /** 最后保存时间 */
-    const lastSavedAt = ref<number | null>(null)
+  /** 保存状态 */
+  const saveStatus = ref<SaveStatus>('saved')
 
-    /** 错误信息 */
-    const errorMessage = ref<string | null>(null)
+  /** 最后保存时间 */
+  const lastSavedAt = ref<number | null>(null)
 
-    // ========== 计算属性 (Getters) ==========
+  /** 错误信息 */
+  const errorMessage = ref<string | null>(null)
 
-    /** 是否有未保存的更改 */
-    const hasUnsavedChanges = computed(() => {
-        return content.value !== originalContent.value
-    })
+  // ========== 计算属性 (Getters) ==========
 
-    /** 当前文件名 */
-    const currentFileName = computed(() => {
-        if (!currentFilePath.value) return '未命名'
-        return currentFilePath.value.split(/[/\\]/).pop() ?? '未命名'
-    })
+  /** 是否有未保存的更改 */
+  const hasUnsavedChanges = computed(() => {
+    return content.value !== originalContent.value
+  })
 
-    /** 是否为新文件 */
-    const isNewFile = computed(() => currentFilePath.value === null)
+  /** 当前文件名 */
+  const currentFileName = computed(() => {
+    if (!currentFilePath.value) return '未命名'
+    return currentFilePath.value.split(/[/\\]/).pop() ?? '未命名'
+  })
 
-    // ========== 操作方法 (Actions) ==========
+  /** 是否为新文件 */
+  const isNewFile = computed(() => currentFilePath.value === null)
 
-    /**
-     * 获取文件系统服务
-     * 延迟获取确保平台适配器已初始化
-     */
-    const getFileSystem = () => useFileSystem()
+  // ========== 操作方法 (Actions) ==========
 
-    /**
-     * 打开文件
-     * @param filePath 文件路径
-     */
-    async function openFile(filePath: string): Promise<boolean> {
-        try {
-            saveStatus.value = 'saving' // 复用状态表示加载中
-            errorMessage.value = null
+  /**
+   * 获取文件系统服务
+   * 延迟获取确保平台适配器已初始化
+   */
+  const getFileSystem = () => useFileSystem()
 
-            const fs = getFileSystem()
-            const result = await fs.readFile(filePath)
+  /**
+   * 停止监听文件
+   */
+  async function stopWatching(filePath: string) {
+    try {
+      await getFileSystem().unwatchFile(filePath)
+    } catch (e) {
+      console.error('[FileStore] 停止监听失败:', e)
+    }
+  }
 
-            if (!result.success || result.data === undefined) {
-                throw new Error(result.error ?? '读取文件失败')
-            }
-
-            content.value = result.data
-            originalContent.value = result.data
-            currentFilePath.value = filePath
-
-            // 获取文件元信息
-            const metaResult = await fs.getFileMetadata(filePath)
-            if (metaResult.success && metaResult.data) {
-                fileMetadata.value = metaResult.data
-            }
-
-            saveStatus.value = 'saved'
-            return true
-        } catch (error) {
-            const errMsg = error instanceof Error ? error.message : '未知错误'
-            errorMessage.value = errMsg
-            saveStatus.value = 'error'
-            console.error('[FileStore] openFile 失败:', errMsg)
-            return false
+  /**
+   * 开始监听文件
+   */
+  async function startWatching(filePath: string) {
+    try {
+      await getFileSystem().watchFile(filePath, (newContent) => {
+        // 防止自身保存触发的更新（内容一致时不处理）
+        if (newContent !== content.value) {
+          console.log('[FileStore] 外部文件更新，自动刷新')
+          content.value = newContent
+          originalContent.value = newContent
+          saveStatus.value = 'saved'
         }
+      })
+    } catch (e) {
+      console.error('[FileStore] 开始监听失败:', e)
+    }
+  }
+
+  /**
+   * 打开文件
+   * @param filePath 文件路径
+   */
+  async function openFile(filePath: string): Promise<boolean> {
+    try {
+      saveStatus.value = 'saving' // 复用状态表示加载中
+      errorMessage.value = null
+
+      // 停止监听旧文件
+      if (currentFilePath.value) {
+        await stopWatching(currentFilePath.value)
+      }
+
+      const fs = getFileSystem()
+      const result = await fs.readFile(filePath)
+
+      if (!result.success || result.data === undefined) {
+        throw new Error(result.error ?? '读取文件失败')
+      }
+
+      content.value = result.data
+      originalContent.value = result.data
+      currentFilePath.value = filePath
+
+      // 获取文件元信息
+      const metaResult = await fs.getFileMetadata(filePath)
+      if (metaResult.success && metaResult.data) {
+        fileMetadata.value = metaResult.data
+      }
+
+      saveStatus.value = 'saved'
+
+      // 开始监听新文件
+      await startWatching(filePath)
+
+      return true
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : '未知错误'
+      errorMessage.value = errMsg
+      saveStatus.value = 'error'
+      console.error('[FileStore] openFile 失败:', errMsg)
+      return false
+    }
+  }
+
+  /**
+   * 保存文件
+   * @param forcePath 强制保存到指定路径（另存为场景）
+   */
+  async function saveFile(forcePath?: string): Promise<boolean> {
+    const targetPath = forcePath ?? currentFilePath.value
+
+    // 新文件需要先选择保存位置
+    if (!targetPath) {
+      return await saveFileAs()
     }
 
-    /**
-     * 保存文件
-     * @param forcePath 强制保存到指定路径（另存为场景）
-     */
-    async function saveFile(forcePath?: string): Promise<boolean> {
-        const targetPath = forcePath ?? currentFilePath.value
+    try {
+      saveStatus.value = 'saving'
+      errorMessage.value = null
 
-        // 新文件需要先选择保存位置
-        if (!targetPath) {
-            return await saveFileAs()
+      const fs = getFileSystem()
+      const result = await fs.writeFile(targetPath, content.value)
+
+      if (!result.success) {
+        throw new Error(result.error ?? '保存文件失败')
+      }
+
+      originalContent.value = content.value
+
+      // 如果路径改变（另存为），更新监听
+      if (currentFilePath.value !== targetPath) {
+        if (currentFilePath.value) {
+          await stopWatching(currentFilePath.value)
         }
+        await startWatching(targetPath)
+      }
 
-        try {
-            saveStatus.value = 'saving'
-            errorMessage.value = null
+      currentFilePath.value = targetPath
+      saveStatus.value = 'saved'
+      lastSavedAt.value = Date.now()
 
-            const fs = getFileSystem()
-            const result = await fs.writeFile(targetPath, content.value)
+      console.log('[FileStore] 文件已保存:', targetPath)
+      return true
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : '未知错误'
+      errorMessage.value = errMsg
+      saveStatus.value = 'error'
+      console.error('[FileStore] saveFile 失败:', errMsg)
+      return false
+    }
+  }
 
-            if (!result.success) {
-                throw new Error(result.error ?? '保存文件失败')
-            }
+  /**
+   * 另存为
+   */
+  async function saveFileAs(): Promise<boolean> {
+    try {
+      const fs = getFileSystem()
+      const result = await fs.showSaveDialog(currentFileName.value)
 
-            originalContent.value = content.value
-            currentFilePath.value = targetPath
-            saveStatus.value = 'saved'
-            lastSavedAt.value = Date.now()
+      if (!result.success || !result.data) {
+        // 用户取消
+        return false
+      }
 
-            console.log('[FileStore] 文件已保存:', targetPath)
-            return true
-        } catch (error) {
-            const errMsg = error instanceof Error ? error.message : '未知错误'
-            errorMessage.value = errMsg
-            saveStatus.value = 'error'
-            console.error('[FileStore] saveFile 失败:', errMsg)
-            return false
-        }
+      return await saveFile(result.data)
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : '未知错误'
+      errorMessage.value = errMsg
+      saveStatus.value = 'error'
+      return false
+    }
+  }
+
+  /**
+   * 创建新文件
+   */
+  function createNewFile(): void {
+    if (currentFilePath.value) {
+      stopWatching(currentFilePath.value)
+    }
+    content.value = ''
+    originalContent.value = ''
+    currentFilePath.value = null
+    fileMetadata.value = null
+    saveStatus.value = 'saved'
+    errorMessage.value = null
+  }
+
+  /**
+   * 更新内容（由编辑器调用）
+   */
+  function updateContent(newContent: string): void {
+    content.value = newContent
+    if (hasUnsavedChanges.value) {
+      saveStatus.value = 'unsaved'
+    }
+  }
+
+  /**
+   * 防抖保存函数引用
+   */
+  let debouncedSave: ReturnType<typeof debounce> | null = null
+
+  /**
+   * 更新防抖保存函数
+   */
+  function updateDebouncedSave() {
+    if (debouncedSave) {
+      debouncedSave.cancel()
     }
 
-    /**
-     * 另存为
-     */
-    async function saveFileAs(): Promise<boolean> {
-        try {
-            const fs = getFileSystem()
-            const result = await fs.showSaveDialog(currentFileName.value)
+    debouncedSave = debounce(async () => {
+      if (currentFilePath.value && hasUnsavedChanges.value) {
+        console.log('[FileStore] 自动保存触发')
+        await saveFile()
+      }
+    }, settingStore.settings.autoSaveDelay)
+  }
 
-            if (!result.success || !result.data) {
-                // 用户取消
-                return false
-            }
+  // 初始化防抖函数
+  updateDebouncedSave()
 
-            return await saveFile(result.data)
-        } catch (error) {
-            const errMsg = error instanceof Error ? error.message : '未知错误'
-            errorMessage.value = errMsg
-            saveStatus.value = 'error'
-            return false
-        }
+  // 监听配置变化：延迟时间
+  watch(
+    () => settingStore.settings.autoSaveDelay,
+    () => {
+      console.log('[FileStore] 自动保存延迟更新:', settingStore.settings.autoSaveDelay)
+      updateDebouncedSave()
+    },
+  )
+
+  // 监听配置变化：开关
+  watch(
+    () => settingStore.settings.autoSave,
+    (enabled) => {
+      console.log('[FileStore] 自动保存开关:', enabled)
+      if (!enabled && debouncedSave) {
+        debouncedSave.cancel()
+      }
+    },
+  )
+
+  // 监听内容变化，触发防抖保存
+  watch(content, () => {
+    if (hasUnsavedChanges.value) {
+      saveStatus.value = 'unsaved'
+
+      // 仅在开启自动保存时触发
+      if (settingStore.settings.autoSave && debouncedSave) {
+        debouncedSave()
+      }
     }
+  })
 
-    /**
-     * 创建新文件
-     */
-    function createNewFile(): void {
-        content.value = ''
-        originalContent.value = ''
-        currentFilePath.value = null
-        fileMetadata.value = null
-        saveStatus.value = 'saved'
-        errorMessage.value = null
+  /**
+   * 显示打开文件对话框
+   */
+  async function showOpenFileDialog(): Promise<boolean> {
+    try {
+      const fs = getFileSystem()
+      const result = await fs.showOpenDialog()
+
+      if (!result.success || !result.data) {
+        return false
+      }
+
+      return await openFile(result.data)
+    } catch (error) {
+      console.error('[FileStore] showOpenFileDialog 失败:', error)
+      return false
     }
+  }
 
-    /**
-     * 更新内容（由编辑器调用）
-     */
-    function updateContent(newContent: string): void {
-        content.value = newContent
-        if (hasUnsavedChanges.value) {
-            saveStatus.value = 'unsaved'
-        }
-    }
+  // ========== 导出 ==========
+  return {
+    // State
+    currentFilePath,
+    content,
+    fileMetadata,
+    saveStatus,
+    lastSavedAt,
+    errorMessage,
 
-    /**
-     * 防抖保存（内容变化后 1 秒自动保存）
-     */
-    const debouncedSave = debounce(async () => {
-        // 只有有文件路径且有未保存更改时才自动保存
-        if (currentFilePath.value && hasUnsavedChanges.value) {
-            console.log('[FileStore] 自动保存触发')
-            await saveFile()
-        }
-    }, 1000)
+    // Getters
+    hasUnsavedChanges,
+    currentFileName,
+    isNewFile,
 
-    // 监听内容变化，触发防抖保存
-    watch(content, () => {
-        if (hasUnsavedChanges.value) {
-            saveStatus.value = 'unsaved'
-            debouncedSave()
-        }
-    })
-
-    /**
-     * 显示打开文件对话框
-     */
-    async function showOpenFileDialog(): Promise<boolean> {
-        try {
-            const fs = getFileSystem()
-            const result = await fs.showOpenDialog()
-
-            if (!result.success || !result.data) {
-                return false
-            }
-
-            return await openFile(result.data)
-        } catch (error) {
-            console.error('[FileStore] showOpenFileDialog 失败:', error)
-            return false
-        }
-    }
-
-    // ========== 导出 ==========
-    return {
-        // State
-        currentFilePath,
-        content,
-        fileMetadata,
-        saveStatus,
-        lastSavedAt,
-        errorMessage,
-
-        // Getters
-        hasUnsavedChanges,
-        currentFileName,
-        isNewFile,
-
-        // Actions
-        openFile,
-        saveFile,
-        saveFileAs,
-        createNewFile,
-        updateContent,
-        showOpenFileDialog,
-    }
+    // Actions
+    openFile,
+    saveFile,
+    saveFileAs,
+    createNewFile,
+    updateContent,
+    showOpenFileDialog,
+  }
 })

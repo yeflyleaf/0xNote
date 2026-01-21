@@ -91,4 +91,17 @@ export interface IFileSystem {
      * @returns 用户选择的保存路径
      */
     showSaveDialog(defaultFileName: string): Promise<FileOperationResult<string>>
+
+    /**
+     * 监听文件变化
+     * @param filePath 文件路径
+     * @param callback 变化回调
+     */
+    watchFile(filePath: string, callback: (content: string) => void): Promise<void>
+
+    /**
+     * 取消监听文件
+     * @param filePath 文件路径
+     */
+    unwatchFile(filePath: string): Promise<void>
 }
