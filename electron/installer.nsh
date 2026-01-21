@@ -1,10 +1,13 @@
 ; electron/installer.nsh
 ; 0xNote NSIS 自定义安装脚本
-; 实现：欢迎页 -> 组件选择页 -> 安装目录 -> 安装 -> 完成
+; 页面顺序：欢迎页 -> 安装目录 -> 组件选择 -> 安装 -> 完成
 
-!include "MUI2.nsh"
+; 包含所需的 NSIS 头文件
 !include "nsDialogs.nsh"
 !include "LogicLib.nsh"
+
+; ========== 安装程序专用代码（卸载程序阶段不需要） ==========
+!ifndef BUILD_UNINSTALLER
 
 ; ========== 变量定义 ==========
 Var Dialog
@@ -15,8 +18,6 @@ Var AddContextMenu
 
 ; ========== 自定义页面：组件选择 ==========
 Function ComponentsPage
-  !insertmacro MUI_HEADER_TEXT "选择组件" "选择您想要安装的可选组件。"
-  
   nsDialogs::Create 1018
   Pop $Dialog
   
@@ -39,7 +40,7 @@ Function ComponentsPage
   ${NSD_Check} $CheckboxContextMenu
   
   ; 说明文本
-  ${NSD_CreateLabel} 0 72u 100% 36u "提示：$\r$\n• 桌面快捷方式可在桌面快速启动 0xNote$\r$\n• 右键菜单可在文件资源管理器中快速新建 Markdown 文档"
+  ${NSD_CreateLabel} 0 72u 100% 48u "提示：$\r$\n• 桌面快捷方式可在桌面快速启动 0xNote$\r$\n• 右键菜单可在文件资源管理器中快速新建 Markdown 文档"
   Pop $0
   
   nsDialogs::Show
@@ -52,10 +53,13 @@ Function ComponentsPageLeave
 FunctionEnd
 
 ; ========== 注册自定义页面 ==========
-!macro customHeader
-  ; 在欢迎页之后插入组件选择页
+; 使用 electron-builder 提供的 customPageAfterChangeDir 宏
+; 确保页面顺序为：欢迎页 -> 安装目录 -> 组件选择 -> 安装 -> 完成
+!macro customPageAfterChangeDir
   Page custom ComponentsPage ComponentsPageLeave
 !macroend
+
+!endif ; BUILD_UNINSTALLER
 
 ; ========== 安装时执行 ==========
 !macro customInstall
@@ -116,5 +120,3 @@ FunctionEnd
   
   DetailPrint "卸载清理完成"
 !macroend
-
-

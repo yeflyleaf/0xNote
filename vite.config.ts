@@ -24,4 +24,6 @@ export default defineConfig({
     target: 'esnext',
     sourcemap: true,
   },
+  // Electron 生产模式使用 file:// 协议，必须使用相对路径
+  base: './',
 })

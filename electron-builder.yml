@@ -34,11 +34,8 @@ win:
     - target: nsis
       arch:
         - x64
-    - target: portable
-      arch:
-        - x64
+
   icon: public/icon.ico
-  artifactName: '${productName}-${arch}.${ext}'
   # 请求管理员权限（用于注册表操作）
   requestedExecutionLevel: asInvoker
 
@@ -53,6 +50,8 @@ nsis:
   shortcutName: 0xNote
   # 包含自定义安装脚本
   include: electron/installer.nsh
+  # NSIS 安装包命名（用于 GitHub Release）
+  artifactName: '${productName}-Setup-${arch}.${ext}'
   # 安装语言
   installerLanguages:
     - zh_CN
