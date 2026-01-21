@@ -6,26 +6,28 @@
   1. 组件只负责 UI 渲染和用户交互
   2. 不直接进行文件 I/O，通过 emit 将内容变化传出
   3. 对外暴露统一的 Props 和 Events，内部实现细节黑盒化
+  4. 实时响应 settingStore 中的配置变化（字体、行号等）
 
   【鸿蒙迁移指南】
   迁移时替换此组件为鸿蒙原生 TextArea + RichText 组件即可，
   保持 modelValue 双向绑定接口不变，外部逻辑无需修改。
 -->
 <script setup lang="ts">
+import { createCompleteTheme, getThemeById } from '@/common/editor/themes'
+import { useSettingStore } from '@/stores'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { bracketMatching } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { Compartment, EditorState } from '@codemirror/state'
-import { oneDark } from '@codemirror/theme-one-dark'
 import {
-    EditorView,
-    highlightActiveLine,
-    highlightActiveLineGutter,
-    keymap,
-    lineNumbers,
+  EditorView,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  keymap,
+  lineNumbers,
 } from '@codemirror/view'
-import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 
 /**
  * Props 类型定义
@@ -60,6 +62,9 @@ const emit = defineEmits<{
   save: []
 }>()
 
+// ========== Store ==========
+const settingStore = useSettingStore()
+
 // ========== 编辑器实例 ==========
 
 /** 编辑器容器 DOM 引用 */
@@ -71,8 +76,22 @@ const editorView = shallowRef<EditorView | null>(null)
 /** 只读模式隔间（用于动态切换） */
 const readOnlyCompartment = new Compartment()
 
+/** 行号显示隔间（用于动态切换） */
+const lineNumbersCompartment = new Compartment()
+
+/** 主题样式隔间（用于动态切换主题、字体等） */
+const themeCompartment = new Compartment()
+
 /** 是否正在内部更新（防止循环更新） */
 let isInternalUpdate = false
+
+// ========== 计算属性 ==========
+
+/** 当前主题的背景色 */
+const editorBackground = computed(() => {
+  const theme = getThemeById(settingStore.settings.editorTheme)
+  return theme.colors.background
+})
 
 // ========== 编辑器配置 ==========
 
@@ -80,9 +99,11 @@ let isInternalUpdate = false
  * 创建编辑器扩展配置
  */
 function createExtensions() {
+  const settings = settingStore.settings
+
   return [
-    // 行号
-    lineNumbers(),
+    // 行号（可动态切换）
+    lineNumbersCompartment.of(settings.showLineNumbers ? lineNumbers() : []),
 
     // 历史记录（撤销/重做）
     history(),
@@ -100,11 +121,13 @@ function createExtensions() {
       codeLanguages: languages,
     }),
 
-    // 语法高亮样式
-    syntaxHighlighting(defaultHighlightStyle),
+    // 自动换行
+    EditorView.lineWrapping,
 
-    // 暗色主题
-    oneDark,
+    // 完整主题（包含编辑器样式和语法高亮）
+    themeCompartment.of(
+      createCompleteTheme(settings.editorTheme, settings.fontSize, settings.fontFamily),
+    ),
 
     // 只读模式（可动态切换）
     readOnlyCompartment.of(EditorState.readOnly.of(props.readonly)),
@@ -130,39 +153,18 @@ function createExtensions() {
         emit('update:modelValue', newContent)
       }
     }),
-
-    // 编辑器主题样式
-    EditorView.theme({
-      '&': {
-        height: '100%',
-        fontSize: '14px',
-        fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-      },
-      '.cm-content': {
-        padding: '16px 0',
-        caretColor: '#00ff88',
-      },
-      '.cm-gutters': {
-        backgroundColor: 'transparent',
-        borderRight: '1px solid rgba(255, 255, 255, 0.1)',
-      },
-      '.cm-activeLineGutter': {
-        backgroundColor: 'rgba(0, 255, 136, 0.1)',
-      },
-      '.cm-activeLine': {
-        backgroundColor: 'rgba(0, 255, 136, 0.05)',
-      },
-      '.cm-scroller': {
-        overflow: 'auto',
-      },
-    }),
   ]
 }
 
 // ========== 生命周期 ==========
 
-onMounted(() => {
+onMounted(async () => {
   if (!editorContainer.value) return
+
+  // 确保设置已加载
+  if (!settingStore.isLoaded) {
+    await settingStore.loadSettings()
+  }
 
   // 创建编辑器状态
   const state = EditorState.create({
@@ -225,6 +227,42 @@ watch(
   },
 )
 
+// 监听设置变化：主题、字体大小、字体家族
+watch(
+  [
+    () => settingStore.settings.editorTheme,
+    () => settingStore.settings.fontSize,
+    () => settingStore.settings.fontFamily,
+  ],
+  ([newTheme, newFontSize, newFontFamily]) => {
+    if (!editorView.value) return
+
+    console.log('[MemoEditor] 主题/字体设置变化:', {
+      theme: newTheme,
+      fontSize: newFontSize,
+      fontFamily: newFontFamily,
+    })
+    editorView.value.dispatch({
+      effects: themeCompartment.reconfigure(
+        createCompleteTheme(newTheme, newFontSize, newFontFamily),
+      ),
+    })
+  },
+)
+
+// 监听设置变化：行号显示
+watch(
+  () => settingStore.settings.showLineNumbers,
+  (showLineNumbers) => {
+    if (!editorView.value) return
+
+    console.log('[MemoEditor] 行号显示变化:', showLineNumbers)
+    editorView.value.dispatch({
+      effects: lineNumbersCompartment.reconfigure(showLineNumbers ? lineNumbers() : []),
+    })
+  },
+)
+
 // ========== 暴露方法 ==========
 
 /**
@@ -262,7 +300,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="memo-editor">
+  <div class="memo-editor" :style="{ backgroundColor: editorBackground }">
     <div ref="editorContainer" class="editor-container" />
   </div>
 </template>
@@ -276,6 +314,7 @@ defineExpose({
   background-color: var(--color-bg-editor, #1e1e2e);
   border-radius: 8px;
   overflow: hidden;
+  transition: background-color 1s ease;
 }
 
 .editor-container {

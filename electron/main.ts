@@ -99,6 +99,20 @@ if (isRegisterMode || isUnregisterMode) {
       mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
     }
 
+    // 设置 Content-Security-Policy（消除安全警告）
+    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [
+            isDev
+              ? "default-src 'self' http://localhost:*; script-src 'self' http://localhost:* 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' http://localhost:* ws://localhost:*"
+              : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'",
+          ],
+        },
+      })
+    })
+
     // 窗口关闭时清除引用
     mainWindow.on('closed', () => {
       mainWindow = null
@@ -282,17 +296,9 @@ if (isRegisterMode || isUnregisterMode) {
   app.whenReady().then(async () => {
     createWindow()
 
-    // Windows: 首次启动时自动注册文件关联和右键菜单
-    if (process.platform === 'win32' && app.isPackaged) {
-      const { isRegistered, registerWindowsIntegration } = await getRegistryModule()
-      if (!isRegistered()) {
-        console.log('[Main] 首次启动，自动注册 Windows 集成...')
-        const result = await registerWindowsIntegration()
-        if (!result.success) {
-          console.warn('[Main] Windows 集成注册失败:', result.error)
-        }
-      }
-    }
+    // ⚠️ Windows 集成（文件关联 + 右键菜单）已移至 NSIS 安装脚本处理
+    // 参见 build/installer.nsh
+    // 保留的 IPC 接口 (registry:register / registry:unregister) 仅供用户手动修复使用
 
     // macOS: 点击 dock 图标时重新创建窗口
     app.on('activate', () => {

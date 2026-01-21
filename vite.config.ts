@@ -16,7 +16,7 @@ export default defineConfig({
   // 开发服务器配置
   server: {
     port: 5173,
-    open: true,
+    open: false, // Electron 模式下不自动打开浏览器
   },
   // 构建配置
   build: {

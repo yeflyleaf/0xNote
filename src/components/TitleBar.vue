@@ -6,12 +6,14 @@
   在 Electron 中可配置为自定义窗口拖拽区域
 -->
 <script setup lang="ts">
+import { getThemeById } from '@/common/editor/themes'
 import type { SaveStatus, ViewMode } from '@/stores'
-import { useAppStore, useFileStore } from '@/stores'
+import { useAppStore, useFileStore, useSettingStore } from '@/stores'
 import { computed } from 'vue'
 
 const fileStore = useFileStore()
 const appStore = useAppStore()
+const settingStore = useSettingStore()
 
 // 计算属性
 const fileName = computed(() => fileStore.currentFileName)
@@ -50,11 +52,26 @@ function handleSave(): void {
 }
 
 function handleToggleTheme(): void {
-  appStore.toggleTheme()
-}
+  // 获取当前主题模式
+  const currentThemeId = settingStore.settings.editorTheme
+  const currentTheme = getThemeById(currentThemeId)
 
-function handleCycleViewMode(): void {
-  appStore.cycleViewMode()
+  // 决定目标主题
+  let targetThemeId: string
+  if (currentTheme.isDark) {
+    // 如果当前是深色，切换到偏好的亮色主题
+    targetThemeId = settingStore.settings.preferredLightTheme
+  } else {
+    // 如果当前是亮色，切换到偏好的深色主题
+    targetThemeId = settingStore.settings.preferredDarkTheme
+  }
+
+  // 更新设置
+  settingStore.updateSetting('editorTheme', targetThemeId)
+
+  // 更新系统主题模式
+  const targetTheme = getThemeById(targetThemeId)
+  appStore.setTheme(targetTheme.isDark ? 'dark' : 'light')
 }
 
 function handleOpenSettings(): void {

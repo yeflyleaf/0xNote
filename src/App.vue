@@ -91,9 +91,13 @@ function handlePreviewScroll(scrollTop: number, scrollHeight: number): void {
       <div :class="['split-view', `view-mode-${appStore.viewMode}`]">
         <!-- 编辑器面板 -->
         <div v-show="appStore.isEditorVisible" class="editor-panel">
-          <MemoEditor ref="editorRef" :model-value="fileStore.content"
-            :readonly="fileStore.fileMetadata?.isReadOnly ?? false" @update:model-value="handleContentChange"
-            @save="handleSave" />
+          <MemoEditor
+            ref="editorRef"
+            :model-value="fileStore.content"
+            :readonly="fileStore.fileMetadata?.isReadOnly ?? false"
+            @update:model-value="handleContentChange"
+            @save="handleSave"
+          />
         </div>
 
         <!-- 分隔条 -->
@@ -101,8 +105,11 @@ function handlePreviewScroll(scrollTop: number, scrollHeight: number): void {
 
         <!-- 预览面板 -->
         <div v-show="appStore.isPreviewVisible" class="preview-panel">
-          <MemoPreview ref="previewRef" :content="fileStore.content"
-            :theme="appStore.theme === 'dark' ? 'dark' : 'light'" @scroll="handlePreviewScroll" />
+          <MemoPreview
+            ref="previewRef"
+            :content="fileStore.content"
+            @scroll="handlePreviewScroll"
+          />
         </div>
       </div>
     </main>
@@ -173,12 +180,14 @@ function handlePreviewScroll(scrollTop: number, scrollHeight: number): void {
 /* 分隔条 */
 .split-divider {
   width: 1px;
-  background: linear-gradient(180deg,
-      transparent 0%,
-      var(--color-border, rgba(255, 255, 255, 0.1)) 20%,
-      var(--color-accent, #00ff88) 50%,
-      var(--color-border, rgba(255, 255, 255, 0.1)) 80%,
-      transparent 100%);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--color-border, rgba(255, 255, 255, 0.1)) 20%,
+    var(--color-accent, #00ff88) 50%,
+    var(--color-border, rgba(255, 255, 255, 0.1)) 80%,
+    transparent 100%
+  );
   opacity: 0.5;
   transition: opacity 0.2s ease;
 }
@@ -197,10 +206,12 @@ function handlePreviewScroll(scrollTop: number, scrollHeight: number): void {
   .split-divider {
     width: 100%;
     height: 1px;
-    background: linear-gradient(90deg,
-        transparent 0%,
-        var(--color-accent, #00ff88) 50%,
-        transparent 100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--color-accent, #00ff88) 50%,
+      transparent 100%
+    );
   }
 }
 </style>

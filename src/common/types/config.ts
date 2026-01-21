@@ -14,36 +14,45 @@
  * 应用配置
  */
 export interface AppSettings {
-    /** 字体大小 (12-24px) */
-    fontSize: number
-    /** 字体家族 */
-    fontFamily: string
-    /** 主题模式 */
-    theme: 'light' | 'dark' | 'system'
-    /** 是否自动保存 */
-    autoSave: boolean
-    /** 自动保存延迟（毫秒） */
-    autoSaveDelay: number
-    /** 显示行号 */
-    showLineNumbers: boolean
-    /** Tab 大小 */
-    tabSize: number
-    /** 预览同步滚动 */
-    syncScroll: boolean
+  /** 字体大小 (12-24px) */
+  fontSize: number
+  /** 字体家族 */
+  fontFamily: string
+  /** 主题模式（用于系统级别的 light/dark 模式） */
+  theme: 'light' | 'dark' | 'system'
+  /** 编辑器主题 ID（具体的配色方案） */
+  editorTheme: string
+  /** 偏好的深色主题 ID（用于快捷切换） */
+  preferredDarkTheme: string
+  /** 偏好的亮色主题 ID（用于快捷切换） */
+  preferredLightTheme: string
+  /** 是否自动保存 */
+  autoSave: boolean
+  /** 自动保存延迟（毫秒） */
+  autoSaveDelay: number
+  /** 显示行号 */
+  showLineNumbers: boolean
+  /** Tab 大小 */
+  tabSize: number
+  /** 预览同步滚动 */
+  syncScroll: boolean
 }
 
 /**
  * 默认配置
  */
 export const DEFAULT_SETTINGS: AppSettings = {
-    fontSize: 14,
-    fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-    theme: 'dark',
-    autoSave: true,
-    autoSaveDelay: 1000,
-    showLineNumbers: true,
-    tabSize: 4,
-    syncScroll: true,
+  fontSize: 14,
+  fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+  theme: 'dark',
+  editorTheme: 'dark-neon',
+  preferredDarkTheme: 'dark-neon',
+  preferredLightTheme: 'light-morning',
+  autoSave: true,
+  autoSaveDelay: 1000,
+  showLineNumbers: true,
+  tabSize: 4,
+  syncScroll: true,
 }
 
 /**
@@ -51,32 +60,32 @@ export const DEFAULT_SETTINGS: AppSettings = {
  * 定义配置读写的契约，平台实现层必须遵循此接口
  */
 export interface IConfigService {
-    /**
-     * 获取完整配置
-     */
-    getSettings(): Promise<AppSettings>
+  /**
+   * 获取完整配置
+   */
+  getSettings(): Promise<AppSettings>
 
-    /**
-     * 保存完整配置
-     * @param settings 配置对象
-     */
-    saveSettings(settings: AppSettings): Promise<void>
+  /**
+   * 保存完整配置
+   * @param settings 配置对象
+   */
+  saveSettings(settings: AppSettings): Promise<void>
 
-    /**
-     * 获取单个配置项
-     * @param key 配置键名
-     */
-    get<K extends keyof AppSettings>(key: K): Promise<AppSettings[K]>
+  /**
+   * 获取单个配置项
+   * @param key 配置键名
+   */
+  get<K extends keyof AppSettings>(key: K): Promise<AppSettings[K]>
 
-    /**
-     * 设置单个配置项
-     * @param key 配置键名
-     * @param value 配置值
-     */
-    set<K extends keyof AppSettings>(key: K, value: AppSettings[K]): Promise<void>
+  /**
+   * 设置单个配置项
+   * @param key 配置键名
+   * @param value 配置值
+   */
+  set<K extends keyof AppSettings>(key: K, value: AppSettings[K]): Promise<void>
 
-    /**
-     * 重置为默认配置
-     */
-    resetToDefaults(): Promise<void>
+  /**
+   * 重置为默认配置
+   */
+  resetToDefaults(): Promise<void>
 }
