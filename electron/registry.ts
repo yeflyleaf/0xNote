@@ -25,7 +25,7 @@ const execAsync = promisify(exec)
 
 // 应用名称
 const APP_NAME = '0xNote'
-const FILE_TYPE_ID = '0xNote.md'
+const FILE_TYPE_ID = '0xNote.Markdown'
 
 /**
  * 注册表操作结果
@@ -85,8 +85,8 @@ async function executeRegCommand(command: string): Promise<RegistryResult> {
  */
 function isAdmin(): boolean {
   try {
-    // 尝试写入一个需要管理员权限的测试键
-    execSync('reg query "HKLM\\SOFTWARE" /ve', { encoding: 'utf-8', stdio: 'pipe' })
+    // 使用 fltmc 检查管理员权限 (比 reg query 更可靠)
+    execSync('fltmc', { stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -95,17 +95,6 @@ function isAdmin(): boolean {
 
 /**
  * 注册 .md 文件类型关联
- *
- * 注册表结构：
- * HKEY_CLASSES_ROOT\.md
- *   (Default) = "0xNote.MarkdownFile"
- *
- * HKEY_CLASSES_ROOT\0xNote.MarkdownFile
- *   (Default) = "Markdown 文档"
- *   \DefaultIcon
- *     (Default) = "path\to\icon.ico"
- *   \shell\open\command
- *     (Default) = "path\to\0xNote.exe" "%1"
  */
 export async function registerFileAssociation(): Promise<RegistryResult> {
   const exePath = getExePath()
@@ -113,38 +102,55 @@ export async function registerFileAssociation(): Promise<RegistryResult> {
 
   // 使用 HKCU 避免需要管理员权限
   const rootKey = isAdmin() ? 'HKCR' : 'HKCU\\Software\\Classes'
+  const errors: string[] = []
 
-  const commands = [
-    // 设置 .md 文件类型
-    `reg add "${rootKey}\\.md" /ve /d "${FILE_TYPE_ID}" /f`,
-
-    // 创建文件类型描述
+  // 1. 注册 ProgID (0xNote.Markdown) - 这是基础，必须成功
+  // 定义文件类型、图标、打开命令、右键编辑
+  const progIdCommands = [
     `reg add "${rootKey}\\${FILE_TYPE_ID}" /ve /d "Markdown 文档" /f`,
-
-    // 设置图标
     `reg add "${rootKey}\\${FILE_TYPE_ID}\\DefaultIcon" /ve /d "${iconPath}" /f`,
-
-    // 设置打开命令
     `reg add "${rootKey}\\${FILE_TYPE_ID}\\shell\\open\\command" /ve /d "\\"${exePath}\\" \\"%1\\"" /f`,
-
-    // 添加 "使用 0xNote 编辑" 右键菜单项
     `reg add "${rootKey}\\${FILE_TYPE_ID}\\shell\\edit" /ve /d "使用 ${APP_NAME} 编辑" /f`,
     `reg add "${rootKey}\\${FILE_TYPE_ID}\\shell\\edit\\command" /ve /d "\\"${exePath}\\" \\"%1\\"" /f`,
-
-    // 添加 "新建 -> Markdown 文档" (ShellNew)
-    // 这会在 Windows 右键菜单的 "新建" 子菜单中添加 "Markdown 文件"
-    `reg add "${rootKey}\\.md\\ShellNew" /v "NullFile" /d "" /f`,
   ]
 
-  for (const cmd of commands) {
+  for (const cmd of progIdCommands) {
     const result = await executeRegCommand(cmd)
     if (!result.success) {
-      return result
+      console.error(`[Registry] ProgID 注册失败: ${cmd}`, result.error)
+      return result // ProgID 失败则无法继续
     }
   }
 
-  console.log('[Registry] 文件类型关联注册成功')
-  return { success: true }
+  // 2. 注册 ShellNew (新建 Markdown 文档) - 这是用户想要的核心功能
+  // 即使文件关联被锁定，这个通常也能成功
+  const shellNewCommands = [
+    `reg add "${rootKey}\\.md\\ShellNew" /v "NullFile" /d "" /f`,
+    `reg add "${rootKey}\\.md" /v "PerceivedType" /d "text" /f`,
+    `reg add "${rootKey}\\.md" /v "Content Type" /d "text/markdown" /f`,
+  ]
+
+  for (const cmd of shellNewCommands) {
+    const result = await executeRegCommand(cmd)
+    if (!result.success) {
+      console.warn(`[Registry] ShellNew 注册警告: ${cmd}`, result.error)
+      errors.push(result.error || 'Unknown error')
+      // 继续执行，不要因为这个失败而停止
+    }
+  }
+
+  // 3. 关联 .md 到 ProgID (尝试修改默认打开方式)
+  // 在 Windows 10/11 上，这可能会因为 "User Choice" 保护而失败或被忽略
+  // 我们尝试执行，但忽略错误
+  const assocCommand = `reg add "${rootKey}\\.md" /ve /d "${FILE_TYPE_ID}" /f`
+  const assocResult = await executeRegCommand(assocCommand)
+  if (!assocResult.success) {
+    console.warn('[Registry] 文件关联警告 (可能是 User Choice 保护):', assocResult.error)
+    // 不视为致命错误
+  }
+
+  console.log('[Registry] 注册流程完成')
+  return { success: true } // 只要 ProgID 成功，我们就认为整体成功
 }
 
 /**
