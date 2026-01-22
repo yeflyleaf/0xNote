@@ -21,6 +21,14 @@
 
 ---
 
+## 🖥️ 主页展示
+
+<p align="center">
+  <img src="public/welcome.png" alt="主页展示" width="100%">
+</p>
+
+---
+
 ## ✨ 核心特性
 
 | 功能                | 描述                                                               |
