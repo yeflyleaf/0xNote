@@ -75,8 +75,8 @@ if (isRegisterMode || isUnregisterMode) {
     mainWindow = new BrowserWindow({
       width: 1200,
       height: 800,
-      minWidth: 600,
-      minHeight: 400,
+      minWidth: 1110,
+      minHeight: 800,
       title: '0xNote',
       icon: path.join(__dirname, '../public/icon.ico'),
       frame: false, // 无边框窗口，使用前端自定义标题栏
@@ -107,8 +107,8 @@ if (isRegisterMode || isUnregisterMode) {
           ...details.responseHeaders,
           'Content-Security-Policy': [
             isDev
-              ? "default-src 'self' http://localhost:*; script-src 'self' http://localhost:* 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' http://localhost:* ws://localhost:*"
-              : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'",
+              ? "default-src 'self' http://localhost:*; script-src 'self' http://localhost:* 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: file:; media-src 'self' https: data: blob: file:; frame-src 'self' https:; connect-src 'self' http://localhost:* ws://localhost:* https:"
+              : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: file:; media-src 'self' https: data: blob: file:; frame-src 'self' https:; connect-src 'self' https:",
           ],
         },
       })

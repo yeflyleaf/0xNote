@@ -100,10 +100,28 @@ function renderMarkdown(content: string): string {
   const rawHtml = md.render(content)
 
   // 2. 使用 DOMPurify 消毒，防止 XSS
+  // 添加钩子：强制所有链接在新窗口打开，并添加 rel="noopener noreferrer"
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.tagName === 'A') {
+      const href = node.getAttribute('href')
+      // 仅对非锚点链接强制新窗口打开
+      if (href && !href.startsWith('#')) {
+        node.setAttribute('target', '_blank')
+        node.setAttribute('rel', 'noopener noreferrer')
+      }
+    }
+    // 如果允许 iframe，强制添加 sandbox 属性以提高安全性
+    if (node.tagName === 'IFRAME') {
+      node.setAttribute('sandbox', 'allow-scripts allow-same-origin')
+    }
+  })
+
   const cleanHtml = DOMPurify.sanitize(rawHtml, {
     USE_PROFILES: { html: true },
-    ADD_ATTR: ['target'], // 允许 target 属性
-    ADD_TAGS: ['iframe'], // 可选：允许嵌入视频
+    ADD_ATTR: ['target', 'allow'], // 允许 target 和 allow (用于 iframe)
+    ADD_TAGS: ['iframe'], // 允许嵌入视频
+    FORBID_TAGS: ['script', 'style'], // 显式禁止脚本和样式标签
+    FORBID_ATTR: ['onmouseover', 'onclick', 'onerror', 'onload'], // 显式禁止事件处理器
   })
 
   return cleanHtml
