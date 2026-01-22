@@ -79,7 +79,8 @@ if (isRegisterMode || isUnregisterMode) {
       minHeight: 400,
       title: '0xNote',
       icon: path.join(__dirname, '../public/icon.ico'),
-      frame: true, // 使用系统标题栏，后续可改为 false 实现自定义
+      frame: false, // 无边框窗口，使用前端自定义标题栏
+      titleBarStyle: 'hidden', // 隐藏原生标题栏
       backgroundColor: '#1e1e2e',
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
@@ -123,9 +124,52 @@ if (isRegisterMode || isUnregisterMode) {
       shell.openExternal(url)
       return { action: 'deny' }
     })
+
+    // 监听窗口最大化状态变化，通知渲染进程
+    mainWindow.on('maximize', () => {
+      mainWindow?.webContents.send('window:maximizeChanged', true)
+    })
+    mainWindow.on('unmaximize', () => {
+      mainWindow?.webContents.send('window:maximizeChanged', false)
+    })
   }
 
   // ==================== IPC Handlers ====================
+
+  // ========== 窗口控制 ==========
+
+  /**
+   * 最小化窗口
+   */
+  ipcMain.handle('window:minimize', () => {
+    mainWindow?.minimize()
+  })
+
+  /**
+   * 最大化/还原窗口
+   */
+  ipcMain.handle('window:toggleMaximize', () => {
+    if (mainWindow?.isMaximized()) {
+      mainWindow.unmaximize()
+    } else {
+      mainWindow?.maximize()
+    }
+  })
+
+  /**
+   * 关闭窗口
+   */
+  ipcMain.handle('window:close', () => {
+    mainWindow?.close()
+  })
+
+  /**
+   * 获取窗口最大化状态
+   */
+  ipcMain.handle('window:isMaximized', () => {
+    return mainWindow?.isMaximized() ?? false
+  })
+
 
   /**
    * 读取文件

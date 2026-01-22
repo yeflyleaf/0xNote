@@ -9,11 +9,14 @@
 import { getThemeById } from '@/common/editor/themes'
 import type { SaveStatus, ViewMode } from '@/stores'
 import { useAppStore, useFileStore, useSettingStore } from '@/stores'
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 const fileStore = useFileStore()
 const appStore = useAppStore()
 const settingStore = useSettingStore()
+
+// 窗口最大化状态
+const isMaximized = ref(false)
 
 // 计算属性
 const fileName = computed(() => fileStore.currentFileName)
@@ -38,7 +41,21 @@ const viewModeConfig: Record<ViewMode, { icon: string; title: string }> = {
 
 const currentStatus = computed(() => statusConfig[saveStatus.value])
 
-// 操作方法
+// ========== 生命周期 ==========
+
+onMounted(async () => {
+  // 初始化窗口最大化状态
+  if (window.electron?.window) {
+    isMaximized.value = await window.electron.window.isMaximized()
+    // 监听窗口最大化状态变化
+    window.electron.window.onMaximizeChange((maximized: boolean) => {
+      isMaximized.value = maximized
+    })
+  }
+})
+
+// ========== 操作方法 ==========
+
 function handleNewFile(): void {
   fileStore.createNewFile()
 }
@@ -76,6 +93,20 @@ function handleToggleTheme(): void {
 
 function handleOpenSettings(): void {
   appStore.openSettings()
+}
+
+// ========== 窗口控制 ==========
+
+function handleMinimize(): void {
+  window.electron?.window.minimize()
+}
+
+function handleToggleMaximize(): void {
+  window.electron?.window.toggleMaximize()
+}
+
+function handleClose(): void {
+  window.electron?.window.close()
 }
 </script>
 
@@ -130,6 +161,34 @@ function handleOpenSettings(): void {
       </button>
 
       <button class="settings-btn" title="设置" @click="handleOpenSettings">⚙️</button>
+
+      <div class="divider" />
+
+      <!-- 窗口控制按钮 -->
+      <div class="window-controls">
+        <button class="window-btn" title="最小化" @click="handleMinimize">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+            <rect x="2" y="5.5" width="8" height="1" />
+          </svg>
+        </button>
+        <button class="window-btn" :title="isMaximized ? '还原' : '最大化'" @click="handleToggleMaximize">
+          <svg v-if="isMaximized" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor">
+            <!-- 还原图标：两个重叠的方框 -->
+            <rect x="3.5" y="0.5" width="8" height="8" rx="0.5" stroke-width="1" />
+            <rect x="0.5" y="3.5" width="8" height="8" rx="0.5" stroke-width="1" fill="var(--color-bg-base, #1e1e2e)" />
+          </svg>
+          <svg v-else width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor">
+            <!-- 最大化图标：单个方框 -->
+            <rect x="1.5" y="1.5" width="9" height="9" rx="0.5" stroke-width="1" />
+          </svg>
+        </button>
+        <button class="window-btn window-btn--close" title="关闭" @click="handleClose">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2">
+            <line x1="2.5" y1="2.5" x2="9.5" y2="9.5" />
+            <line x1="9.5" y1="2.5" x2="2.5" y2="9.5" />
+          </svg>
+        </button>
+      </div>
     </div>
   </header>
 </template>
@@ -355,5 +414,49 @@ function handleOpenSettings(): void {
 
 .settings-btn:hover {
   transform: rotate(45deg);
+}
+
+/* 窗口控制按钮 */
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-left: 4px;
+}
+
+.window-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  color: #cdd6f4;
+}
+
+.window-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.window-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* 关闭按钮特殊样式 */
+.window-btn--close:hover {
+  background: #e81123;
+  color: white;
+}
+
+.window-btn--close:active {
+  background: #bf0f1d;
+}
+
+.window-btn svg {
+  width: 12px;
+  height: 12px;
 }
 </style>

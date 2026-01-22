@@ -86,17 +86,19 @@ watch(
   },
 )
 
-// 监听字体变化，实时预览
+// 监听字体和编辑器相关设置变化，实时预览
 watch(
   [
     () => localSettings.fontFamily,
     () => localSettings.previewFontFamily,
     () => localSettings.fontSize,
+    () => localSettings.tabSize,
   ],
-  ([newFont, newPreviewFont, newSize]) => {
+  ([newFont, newPreviewFont, newSize, newTabSize]) => {
     settingStore.settings.fontFamily = newFont
     settingStore.settings.previewFontFamily = newPreviewFont
     settingStore.settings.fontSize = newSize
+    settingStore.settings.tabSize = newTabSize
   },
 )
 

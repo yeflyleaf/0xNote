@@ -19,6 +19,13 @@ interface ElectronAPI {
     app: {
         getLaunchArgs: () => Promise<string[]>
     }
+    window: {
+        minimize: () => Promise<void>
+        toggleMaximize: () => Promise<void>
+        close: () => Promise<void>
+        isMaximized: () => Promise<boolean>
+        onMaximizeChange: (callback: (isMaximized: boolean) => void) => void
+    }
 }
 
 declare global {

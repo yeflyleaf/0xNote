@@ -15,11 +15,11 @@
 <script setup lang="ts">
 import { createCompleteTheme, getThemeById } from '@/common/editor/themes'
 import { useSettingStore } from '@/stores'
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { bracketMatching } from '@codemirror/language'
+import { bracketMatching, indentUnit } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
-import { Compartment, EditorState } from '@codemirror/state'
+import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import {
   EditorView,
   highlightActiveLine,
@@ -84,6 +84,9 @@ const lineNumbersCompartment = new Compartment()
 /** 主题样式隔间（用于动态切换主题、字体等） */
 const themeCompartment = new Compartment()
 
+/** Tab 大小隔间（用于动态切换） */
+const tabSizeCompartment = new Compartment()
+
 /** 是否正在内部更新（防止循环更新） */
 let isInternalUpdate = false
 
@@ -134,10 +137,15 @@ function createExtensions() {
     // 只读模式（可动态切换）
     readOnlyCompartment.of(EditorState.readOnly.of(props.readonly)),
 
+    // Tab 大小配置（可动态切换）
+    tabSizeCompartment.of(createTabSizeExtension(settings.tabSize)),
+
     // 快捷键
     keymap.of([
       ...defaultKeymap,
       ...historyKeymap,
+      // Tab 缩进 / Shift+Tab 减少缩进
+      indentWithTab,
       // Ctrl+S 保存
       {
         key: 'Mod-s',
@@ -155,6 +163,19 @@ function createExtensions() {
         emit('update:modelValue', newContent)
       }
     }),
+  ]
+}
+
+/**
+ * 创建 Tab 大小扩展
+ * @param size Tab 空格数
+ */
+function createTabSizeExtension(size: number): Extension {
+  return [
+    // 缩进单位（用于 Tab 键缩进）
+    indentUnit.of(' '.repeat(size)),
+    // Tab 字符显示宽度
+    EditorState.tabSize.of(size),
   ]
 }
 
@@ -276,6 +297,19 @@ watch(
     console.log('[MemoEditor] 行号显示变化:', showLineNumbers)
     editorView.value.dispatch({
       effects: lineNumbersCompartment.reconfigure(showLineNumbers ? lineNumbers() : []),
+    })
+  },
+)
+
+// 监听设置变化：Tab 大小
+watch(
+  () => settingStore.settings.tabSize,
+  (newTabSize) => {
+    if (!editorView.value) return
+
+    console.log('[MemoEditor] Tab 大小变化:', newTabSize)
+    editorView.value.dispatch({
+      effects: tabSizeCompartment.reconfigure(createTabSizeExtension(newTabSize)),
     })
   },
 )

@@ -36,6 +36,17 @@ const electronAPI = {
     app: {
         getLaunchArgs: () => ipcRenderer.invoke('app:getLaunchArgs'),
     },
+
+    // ========== 窗口控制 ==========
+    window: {
+        minimize: () => ipcRenderer.invoke('window:minimize'),
+        toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
+        close: () => ipcRenderer.invoke('window:close'),
+        isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+        onMaximizeChange: (callback: (isMaximized: boolean) => void) => {
+            ipcRenderer.on('window:maximizeChanged', (_event, isMaximized) => callback(isMaximized))
+        },
+    },
 }
 
 // 暴露到 window.electron
