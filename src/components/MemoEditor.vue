@@ -19,6 +19,13 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { bracketMatching, indentUnit } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
+import {
+  getSearchQuery,
+  highlightSelectionMatches,
+  openSearchPanel,
+  search,
+  searchKeymap
+} from '@codemirror/search'
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import {
   EditorView,
@@ -62,7 +69,11 @@ const emit = defineEmits<{
   save: []
   /** 滚动事件 */
   scroll: [percentage: number]
+  /** 搜索结果更新事件 */
+  'search-results': [count: number]
 }>()
+
+
 
 // ========== Store ==========
 const settingStore = useSettingStore()
@@ -98,6 +109,89 @@ const editorBackground = computed(() => {
   return theme.colors.background
 })
 
+// ========== Markdown 格式化辅助函数 ==========
+
+/**
+ * 用指定的标记包裹选中的文本
+ * @param view 编辑器视图
+ * @param prefix 前缀标记
+ * @param suffix 后缀标记（默认与前缀相同）
+ */
+function wrapSelection(view: EditorView, prefix: string, suffix: string = prefix): boolean {
+  const { from, to } = view.state.selection.main
+  const selectedText = view.state.sliceDoc(from, to)
+
+  // 如果没有选中文本，插入标记并将光标放在中间
+  if (from === to) {
+    const insertText = prefix + suffix
+    view.dispatch({
+      changes: { from, to, insert: insertText },
+      selection: { anchor: from + prefix.length },
+    })
+    return true
+  }
+
+  // 包裹选中的文本
+  const newText = prefix + selectedText + suffix
+  view.dispatch({
+    changes: { from, to, insert: newText },
+    selection: { anchor: from + prefix.length, head: from + prefix.length + selectedText.length },
+  })
+  return true
+}
+
+/**
+ * 插入链接格式
+ */
+function insertLink(view: EditorView): boolean {
+  const { from, to } = view.state.selection.main
+  const selectedText = view.state.sliceDoc(from, to) || '链接文本'
+
+  const linkText = `[${selectedText}](url)`
+  view.dispatch({
+    changes: { from, to, insert: linkText },
+    // 选中 url 部分便于用户替换
+    selection: { anchor: from + selectedText.length + 3, head: from + selectedText.length + 6 },
+  })
+  return true
+}
+
+/**
+ * 插入图片格式
+ */
+function insertImage(view: EditorView): boolean {
+  const { from, to } = view.state.selection.main
+  const selectedText = view.state.sliceDoc(from, to) || '图片描述'
+
+  const imageText = `![${selectedText}](url)`
+  view.dispatch({
+    changes: { from, to, insert: imageText },
+    // 选中 url 部分便于用户替换
+    selection: { anchor: from + selectedText.length + 4, head: from + selectedText.length + 7 },
+  })
+  return true
+}
+
+/**
+ * 插入代码块
+ */
+function insertCodeBlock(view: EditorView): boolean {
+  const { from, to } = view.state.selection.main
+  const selectedText = view.state.sliceDoc(from, to)
+
+  // 如果有选中的文本，包裹在代码块中
+  const codeBlockText = selectedText
+    ? '```\n' + selectedText + '\n```'
+    : '```\n\n```'
+
+  view.dispatch({
+    changes: { from, to, insert: codeBlockText },
+    // 光标放在语言标识符后面或代码块内
+    selection: { anchor: selectedText ? from + 4 : from + 4 },
+  })
+  return true
+}
+
 // ========== 编辑器配置 ==========
 
 /**
@@ -107,6 +201,26 @@ function createExtensions() {
   const settings = settingStore.settings
 
   return [
+    // 界面文本汉化
+    EditorState.phrases.of({
+      // 搜索面板
+      'Find': '查找',
+      'Replace': '替换',
+      'next': '下一个',
+      'previous': '上一个',
+      'all': '全部',
+      'match case': '区分大小写',
+      'by word': '全字匹配',
+      'regexp': '正则表达式',
+      'replace': '替换',
+      'replace all': '全部替换',
+      'close': '关闭',
+
+      // 跳转行面板 (Alt+G)
+      'Go to line': '跳转到行',
+      'go': '跳转',
+    }),
+
     // 行号（可动态切换）
     lineNumbersCompartment.of(settings.showLineNumbers ? lineNumbers() : []),
 
@@ -129,6 +243,12 @@ function createExtensions() {
     // 自动换行
     EditorView.lineWrapping,
 
+    // 搜索功能
+    search({
+      top: true, // 搜索面板在顶部
+    }),
+    highlightSelectionMatches(), // 高亮匹配的选中文本
+
     // 完整主题（包含编辑器样式和语法高亮）
     themeCompartment.of(
       createCompleteTheme(settings.editorTheme, settings.fontSize, settings.fontFamily),
@@ -142,10 +262,8 @@ function createExtensions() {
 
     // 快捷键
     keymap.of([
-      ...defaultKeymap,
-      ...historyKeymap,
-      // Tab 缩进 / Shift+Tab 减少缩进
-      indentWithTab,
+      // ========== 自定义快捷键 (优先匹配) ==========
+
       // Ctrl+S 保存
       {
         key: 'Mod-s',
@@ -154,6 +272,67 @@ function createExtensions() {
           return true
         },
       },
+
+      // ========== Markdown 格式化快捷键 ==========
+
+      // Ctrl+B: 粗体
+      {
+        key: 'Mod-b',
+        run: (view) => wrapSelection(view, '**'),
+      },
+
+      // Ctrl+I: 斜体
+      {
+        key: 'Mod-i',
+        run: (view) => wrapSelection(view, '*'),
+      },
+
+      // Ctrl+Shift+X: 删除线
+      {
+        key: 'Mod-Shift-x',
+        run: (view) => wrapSelection(view, '~~'),
+      },
+
+      // Ctrl+`: 行内代码
+      {
+        key: 'Mod-`',
+        run: (view) => wrapSelection(view, '`'),
+      },
+
+      // Ctrl+Shift+K: 代码块
+      {
+        key: 'Mod-Shift-k',
+        run: (view) => insertCodeBlock(view),
+      },
+
+      // Ctrl+K: 插入链接
+      {
+        key: 'Mod-k',
+        run: (view) => insertLink(view),
+      },
+
+      // Ctrl+Shift+I: 插入图片
+      {
+        key: 'Mod-Shift-i',
+        run: (view) => insertImage(view),
+      },
+
+      // Ctrl+H: 打开替换面板 (search 扩展自带，但我们覆盖确保生效)
+      {
+        key: 'Mod-h',
+        run: (view) => {
+          openSearchPanel(view)
+          return true
+        },
+      },
+
+      // Tab 缩进 / Shift+Tab 减少缩进
+      indentWithTab,
+
+      // ========== 默认快捷键 ==========
+      ...defaultKeymap,
+      ...historyKeymap,
+      ...searchKeymap, // 搜索快捷键 (Ctrl+F, Ctrl+G, etc.)
     ]),
 
     // 内容变化监听
@@ -161,6 +340,19 @@ function createExtensions() {
       if (update.docChanged && !isInternalUpdate) {
         const newContent = update.state.doc.toString()
         emit('update:modelValue', newContent)
+      }
+
+      // 计算搜索结果数量
+      const query = getSearchQuery(update.state)
+      if (query && query.search) {
+        let count = 0
+        const cursor = query.getCursor(update.state)
+        while (!cursor.next().done) {
+          count++
+        }
+        emit('search-results', count)
+      } else {
+        emit('search-results', 0)
       }
     }),
   ]
@@ -407,5 +599,91 @@ defineExpose({
 /* 确保 CodeMirror 填满容器 */
 .editor-container :deep(.cm-editor) {
   height: 100%;
+}
+
+/* ========== 搜索面板样式 ========== */
+.editor-container :deep(.cm-search) {
+  background: var(--color-bg-surface, #181825);
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  padding: 8px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.editor-container :deep(.cm-search input),
+.editor-container :deep(.cm-search input[type="text"]) {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.15));
+  border-radius: 6px;
+  color: var(--color-text-primary, #cdd6f4);
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.editor-container :deep(.cm-search input:focus) {
+  border-color: var(--color-accent, #00ff88);
+  background: rgba(0, 255, 136, 0.05);
+}
+
+.editor-container :deep(.cm-search button),
+.editor-container :deep(.cm-search .cm-button) {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  color: var(--color-text-secondary, #a6adc8);
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.editor-container :deep(.cm-search button:hover),
+.editor-container :deep(.cm-search .cm-button:hover) {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--color-text-primary, #cdd6f4);
+}
+
+.editor-container :deep(.cm-search label) {
+  color: var(--color-text-secondary, #a6adc8);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.editor-container :deep(.cm-search br) {
+  display: none;
+}
+
+/* 高亮匹配项 */
+/* 高亮匹配项 */
+.editor-container :deep(.cm-selectionMatch) {
+  background-color: rgba(0, 255, 136, 0.25) !important;
+  border-bottom: 2px solid rgba(0, 255, 136, 0.5);
+}
+
+.editor-container :deep(.cm-searchMatch) {
+  background-color: rgba(255, 235, 59, 0.5) !important;
+  /* 亮黄色 */
+  /* 使用 box-shadow 扩展背景范围，确保覆盖大字体 */
+  box-shadow: 0 0 0 1px rgba(255, 235, 59, 0.5);
+  border-radius: 2px;
+  color: inherit !important;
+}
+
+.editor-container :deep(.cm-searchMatch-selected) {
+  background-color: #ff5722 !important;
+  /* 醒目的深橙色 */
+  color: #ffffff !important;
+  /* 强制白字 */
+  /* 使用 box-shadow 扩展背景范围 (2px) 并添加发光效果 */
+  box-shadow: 0 0 0 2px #ff5722, 0 0 8px rgba(255, 87, 34, 0.6);
+  border-radius: 3px;
+  font-weight: bold;
+  z-index: 10;
 }
 </style>

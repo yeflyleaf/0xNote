@@ -7,12 +7,15 @@
   2. 处理应用初始化（检查启动参数）
   3. 协调编辑器与 Store 的通信
   4. 实现分栏布局和视图切换
+  5. 全局快捷键监听
 -->
 <script setup lang="ts">
+import { getThemeById } from '@/common/editor/themes'
 import { MemoEditor, MemoPreview, StatusBar, TitleBar } from '@/components'
 import SettingsModal from '@/components/SettingsModal.vue'
+import ShortcutsModal from '@/components/ShortcutsModal.vue'
 import { useAppStore, useFileStore, useSettingStore } from '@/stores'
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 const fileStore = useFileStore()
 const appStore = useAppStore()
@@ -24,6 +27,89 @@ const previewRef = ref<InstanceType<typeof MemoPreview> | null>(null)
 
 // 是否正在同步滚动（防止循环）
 let isSyncingScroll = false
+
+// 搜索结果数量
+const searchResultCount = ref(0)
+
+// ========== 全局快捷键 ==========
+
+/**
+ * 全局快捷键处理
+ */
+function handleGlobalKeydown(event: KeyboardEvent): void {
+  const { key, ctrlKey, shiftKey, altKey } = event
+
+  // 只处理 Ctrl 组合键
+  if (!ctrlKey) return
+
+  // Ctrl + N: 新建文件
+  if (key === 'n' && !shiftKey && !altKey) {
+    event.preventDefault()
+    fileStore.createNewFile()
+    return
+  }
+
+  // Ctrl + O: 打开文件
+  if (key === 'o' && !shiftKey && !altKey) {
+    event.preventDefault()
+    fileStore.showOpenFileDialog()
+    return
+  }
+
+  // Ctrl + Shift + S: 另存为
+  if (key === 'S' && shiftKey && !altKey) {
+    event.preventDefault()
+    fileStore.saveFileAs()
+    return
+  }
+
+  // Ctrl + P: 切换视图模式
+  if (key === 'p' && !shiftKey && !altKey) {
+    event.preventDefault()
+    appStore.cycleViewMode()
+    return
+  }
+
+  // Ctrl + Shift + T: 切换主题
+  if (key === 'T' && shiftKey && !altKey) {
+    event.preventDefault()
+    handleToggleTheme()
+    return
+  }
+
+  // Ctrl + ,: 打开设置
+  if (key === ',' && !shiftKey && !altKey) {
+    event.preventDefault()
+    appStore.openSettings()
+    return
+  }
+
+  // Ctrl + /: 快捷键帮助
+  if (key === '/' && !shiftKey && !altKey) {
+    event.preventDefault()
+    appStore.openShortcuts()
+    return
+  }
+}
+
+/**
+ * 切换主题（复用 TitleBar 的逻辑）
+ */
+function handleToggleTheme(): void {
+  const currentThemeId = settingStore.settings.editorTheme
+  const currentTheme = getThemeById(currentThemeId)
+
+  let targetThemeId: string
+  if (currentTheme.isDark) {
+    targetThemeId = settingStore.settings.preferredLightTheme
+  } else {
+    targetThemeId = settingStore.settings.preferredDarkTheme
+  }
+
+  settingStore.updateSetting('editorTheme', targetThemeId)
+  const targetTheme = getThemeById(targetThemeId)
+  appStore.setTheme(targetTheme.isDark ? 'dark' : 'light')
+}
 
 // ========== 生命周期 ==========
 
@@ -45,7 +131,15 @@ onMounted(async () => {
     await fileStore.openFile(launchFilePath)
   }
 
+  // 注册全局快捷键监听
+  window.addEventListener('keydown', handleGlobalKeydown)
+
   console.log('[App] 0xNote 启动完成 ✨')
+})
+
+onUnmounted(() => {
+  // 移除全局快捷键监听
+  window.removeEventListener('keydown', handleGlobalKeydown)
 })
 
 // ========== 事件处理 ==========
@@ -95,7 +189,15 @@ function handlePreviewScroll(percentage: number): void {
     isSyncingScroll = false
   }, 100)
 }
+
+/**
+ * 处理搜索结果更新
+ */
+function handleSearchResults(count: number): void {
+  searchResultCount.value = count
+}
 </script>
+
 
 <template>
   <div class="app-container">
@@ -110,7 +212,7 @@ function handlePreviewScroll(percentage: number): void {
         <div v-show="appStore.isEditorVisible" class="editor-panel">
           <MemoEditor ref="editorRef" :model-value="fileStore.content"
             :readonly="fileStore.fileMetadata?.isReadOnly ?? false" @update:model-value="handleContentChange"
-            @save="handleSave" @scroll="handleEditorScroll" />
+            @save="handleSave" @scroll="handleEditorScroll" @search-results="handleSearchResults" />
         </div>
 
         <!-- 分隔条 -->
@@ -124,10 +226,13 @@ function handlePreviewScroll(percentage: number): void {
     </main>
 
     <!-- 状态栏 -->
-    <StatusBar />
+    <StatusBar :search-result-count="searchResultCount" />
 
     <!-- 设置模态框 -->
     <SettingsModal v-if="appStore.isSettingsOpen" @close="appStore.closeSettings()" />
+
+    <!-- 快捷键模态框 -->
+    <ShortcutsModal v-if="appStore.isShortcutsOpen" @close="appStore.closeShortcuts()" />
   </div>
 </template>
 

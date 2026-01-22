@@ -5,8 +5,13 @@
   显示字符数、行数、光标位置等信息
 -->
 <script setup lang="ts">
-import { useFileStore } from '@/stores'
-import { computed } from 'vue'
+import { useFileStore } from '@/stores';
+import { computed } from 'vue';
+
+defineProps<{
+  /** 搜索结果数量 */
+  searchResultCount?: number
+}>()
 
 const fileStore = useFileStore()
 
@@ -55,6 +60,10 @@ const lastSavedTime = computed(() => {
     </div>
 
     <div class="status-bar__right">
+      <span v-if="searchResultCount && searchResultCount > 0" class="search-results">
+        找到 {{ searchResultCount }} 个结果
+      </span>
+      <span class="divider" v-if="searchResultCount && searchResultCount > 0" />
       <span v-if="lastSavedTime" class="last-saved"> 上次保存: {{ lastSavedTime }} </span>
       <span class="language-badge">Markdown</span>
     </div>
@@ -112,6 +121,12 @@ const lastSavedTime = computed(() => {
   border-radius: 4px;
   background: rgba(0, 255, 136, 0.1);
   color: #00ff88;
+  font-weight: 500;
+}
+
+.search-results {
+  color: #fab387;
+  /* 使用醒目的颜色，如橙色 */
   font-weight: 500;
 }
 </style>

@@ -68,6 +68,10 @@ function handleSave(): void {
   fileStore.saveFile()
 }
 
+function handleSaveAs(): void {
+  fileStore.saveFileAs()
+}
+
 function handleToggleTheme(): void {
   // 获取当前主题模式
   const currentThemeId = settingStore.settings.editorTheme
@@ -129,6 +133,19 @@ function handleClose(): void {
         <button class="menu-btn" title="保存 (Ctrl+S)" :disabled="!hasUnsavedChanges" @click="handleSave">
           <span class="icon">💾</span>
         </button>
+        <button class="menu-btn" title="另存为 (Ctrl+Shift+S)" @click="handleSaveAs">
+          <span class="icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path
+                d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h10.2z" />
+              <path d="M17 21v-8H7v8" />
+              <path d="M7 3v5h8" />
+              <line x1="12" y1="11" x2="12" y2="17" />
+              <line x1="9" y1="14" x2="15" y2="14" />
+            </svg>
+          </span>
+        </button>
       </nav>
     </div>
 
@@ -159,6 +176,8 @@ function handleClose(): void {
       <button class="theme-toggle" title="切换主题" @click="handleToggleTheme">
         {{ appStore.theme === 'dark' ? '🌙' : '☀️' }}
       </button>
+
+      <button class="shortcuts-btn" title="快捷键 (Ctrl+/)" @click="appStore.openShortcuts()">⌨️</button>
 
       <button class="settings-btn" title="设置" @click="handleOpenSettings">⚙️</button>
 
@@ -392,6 +411,7 @@ function handleClose(): void {
 
 /* 主题切换按钮 */
 .theme-toggle,
+.shortcuts-btn,
 .settings-btn {
   display: flex;
   align-items: center;
@@ -407,9 +427,14 @@ function handleClose(): void {
 }
 
 .theme-toggle:hover,
+.shortcuts-btn:hover,
 .settings-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   transform: rotate(15deg);
+}
+
+.shortcuts-btn:hover {
+  transform: scale(1.1);
 }
 
 .settings-btn:hover {
