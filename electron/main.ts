@@ -10,7 +10,7 @@
  * - 命令行参数处理（--register / --unregister）
  */
 
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -72,6 +72,9 @@ if (isRegisterMode || isUnregisterMode) {
    * 创建主窗口
    */
   function createWindow(): void {
+    // 移除默认菜单（加速启动）
+    Menu.setApplicationMenu(null)
+
     mainWindow = new BrowserWindow({
       width: 1200,
       height: 800,
@@ -82,12 +85,18 @@ if (isRegisterMode || isUnregisterMode) {
       frame: false, // 无边框窗口，使用前端自定义标题栏
       titleBarStyle: 'hidden', // 隐藏原生标题栏
       backgroundColor: '#1e1e2e',
+      show: false, // ⚠️ 优化：默认隐藏，直到 ready-to-show
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: false,
       },
+    })
+
+    // 优化：等待页面渲染完成后再显示窗口，避免白屏/闪烁
+    mainWindow.once('ready-to-show', () => {
+      mainWindow?.show()
     })
 
     // 加载页面
