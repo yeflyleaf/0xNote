@@ -15,7 +15,7 @@ import { MemoEditor, MemoPreview, StatusBar, TitleBar } from '@/components'
 import SettingsModal from '@/components/SettingsModal.vue'
 import ShortcutsModal from '@/components/ShortcutsModal.vue'
 import { useAppStore, useFileStore, useSettingStore } from '@/stores'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const fileStore = useFileStore()
 const appStore = useAppStore()
@@ -30,6 +30,57 @@ let isSyncingScroll = false
 
 // 搜索结果数量
 const searchResultCount = ref(0)
+
+// ========== 分栏调整 ==========
+
+const splitViewRef = ref<HTMLElement | null>(null)
+const splitRatio = ref(0.5)
+const isResizing = ref(false)
+
+const splitPanelStyles = computed(() => {
+  if (appStore.viewMode !== 'split') return {}
+  return {
+    editor: { flex: splitRatio.value },
+    preview: { flex: 1 - splitRatio.value }
+  }
+})
+
+function startResize() {
+  // 仅在桌面端允许调整
+  if (window.innerWidth <= 768) return
+
+  isResizing.value = true
+  document.addEventListener('mousemove', handleResize)
+  document.addEventListener('mouseup', stopResize)
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+
+function handleResize(e: MouseEvent) {
+  if (!splitViewRef.value) return
+  const rect = splitViewRef.value.getBoundingClientRect()
+  const offsetX = e.clientX - rect.left
+  const newRatio = offsetX / rect.width
+  // 限制调整范围 (20% - 80%)
+  splitRatio.value = Math.min(Math.max(newRatio, 0.2), 0.8)
+}
+
+function stopResize() {
+  isResizing.value = false
+  document.removeEventListener('mousemove', handleResize)
+  document.removeEventListener('mouseup', stopResize)
+  document.body.style.userSelect = ''
+}
+
+// 监听视图模式变化，切换回分栏模式时重置比例
+watch(
+  () => appStore.viewMode,
+  (newMode) => {
+    if (newMode === 'split') {
+      splitRatio.value = 0.5
+    }
+  }
+)
 
 // ========== 全局快捷键 ==========
 
@@ -207,20 +258,21 @@ function handleSearchResults(count: number): void {
     <!-- 主编辑区域 -->
     <main class="main-content">
       <!-- 分栏布局容器 -->
-      <div :class="['split-view', `view-mode-${appStore.viewMode}`]">
+      <div ref="splitViewRef" :class="['split-view', `view-mode-${appStore.viewMode}`]">
         <!-- 编辑器面板 -->
-        <div v-show="appStore.isEditorVisible" class="editor-panel">
+        <div v-show="appStore.isEditorVisible" class="editor-panel" :style="splitPanelStyles.editor">
           <MemoEditor ref="editorRef" :model-value="fileStore.content"
             :readonly="fileStore.fileMetadata?.isReadOnly ?? false" @update:model-value="handleContentChange"
             @save="handleSave" @scroll="handleEditorScroll" @search-results="handleSearchResults" />
         </div>
 
         <!-- 分隔条 -->
-        <div v-if="appStore.viewMode === 'split'" class="split-divider" />
+        <div v-if="appStore.viewMode === 'split'" class="split-divider" @mousedown.prevent="startResize" />
 
         <!-- 预览面板 -->
-        <div v-show="appStore.isPreviewVisible" class="preview-panel">
-          <MemoPreview ref="previewRef" :content="fileStore.content" :file-path="fileStore.currentFilePath" @scroll="handlePreviewScroll" />
+        <div v-show="appStore.isPreviewVisible" class="preview-panel" :style="splitPanelStyles.preview">
+          <MemoPreview ref="previewRef" :content="fileStore.content" :file-path="fileStore.currentFilePath"
+            @scroll="handlePreviewScroll" />
         </div>
       </div>
     </main>
@@ -255,7 +307,7 @@ function handleSearchResults(count: number): void {
 .split-view {
   display: flex;
   flex: 1;
-  gap: 16px;
+  /* gap: 16px; 移除固定间距，由分隔条控制 */
   min-height: 0;
 }
 
@@ -292,8 +344,21 @@ function handleSearchResults(count: number): void {
 }
 
 /* 分隔条 */
+/* 分隔条 */
 .split-divider {
+  width: 16px;
+  /* 增加点击区域 */
+  display: flex;
+  justify-content: center;
+  cursor: col-resize;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.split-divider::after {
+  content: '';
   width: 1px;
+  height: 100%;
   background: linear-gradient(180deg,
       transparent 0%,
       var(--color-border, rgba(255, 255, 255, 0.1)) 20%,
@@ -304,8 +369,15 @@ function handleSearchResults(count: number): void {
   transition: opacity 0.2s ease;
 }
 
-.split-divider:hover {
+.split-divider:hover::after,
+.split-divider:active::after {
   opacity: 1;
+  background: linear-gradient(180deg,
+      transparent 0%,
+      var(--color-accent, #00ff88) 20%,
+      var(--color-accent, #00ff88) 80%,
+      transparent 100%);
+  box-shadow: 0 0 4px var(--color-accent, #00ff88);
 }
 
 /* ========== 响应式 ========== */
@@ -316,6 +388,14 @@ function handleSearchResults(count: number): void {
   }
 
   .split-divider {
+    width: 100%;
+    height: 16px;
+    cursor: row-resize;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .split-divider::after {
     width: 100%;
     height: 1px;
     background: linear-gradient(90deg,
