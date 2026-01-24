@@ -124,11 +124,15 @@ const defaultImageRender = md.renderer.rules.image || function (tokens, idx, opt
 
 md.renderer.rules.image = (tokens, idx, options, env, self) => {
   const token = tokens[idx]
+  if (!token) return defaultImageRender(tokens, idx, options, env, self)
+
   const srcIndex = token.attrIndex('src')
 
-  if (srcIndex >= 0) {
+  if (srcIndex >= 0 && token.attrs && token.attrs[srcIndex]) {
     const src = token.attrs[srcIndex][1]
-    token.attrs[srcIndex][1] = transformImageSrc(src)
+    if (src) {
+      token.attrs[srcIndex][1] = transformImageSrc(src)
+    }
   }
 
   return defaultImageRender(tokens, idx, options, env, self)
@@ -206,7 +210,7 @@ function renderMarkdown(content: string): string {
     FORBID_TAGS: ['script', 'style'], // 显式禁止脚本和样式标签
     FORBID_ATTR: ['onmouseover', 'onclick', 'onerror', 'onload'], // 显式禁止事件处理器
     ALLOWED_URI_SCHEMES: ['http', 'https', 'ftp', 'mailto', 'tel', 'file', 'data'], // 允许 file 和 data 协议
-  })
+  } as object) as string // Cast to object to avoid type error with ALLOWED_URI_SCHEMES, and cast result to string
 
   return cleanHtml
 }
