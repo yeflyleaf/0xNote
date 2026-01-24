@@ -91,6 +91,7 @@ if (isRegisterMode || isUnregisterMode) {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: false,
+        webSecurity: false, // 允许加载本地资源 (file://)
       },
     })
 

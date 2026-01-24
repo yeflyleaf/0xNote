@@ -220,7 +220,7 @@ function handleSearchResults(count: number): void {
 
         <!-- 预览面板 -->
         <div v-show="appStore.isPreviewVisible" class="preview-panel">
-          <MemoPreview ref="previewRef" :content="fileStore.content" @scroll="handlePreviewScroll" />
+          <MemoPreview ref="previewRef" :content="fileStore.content" :file-path="fileStore.currentFilePath" @scroll="handlePreviewScroll" />
         </div>
       </div>
     </main>

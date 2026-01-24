@@ -1,8 +1,12 @@
 <h1 align="center"> 🚀 0xNote ( Markdown 编辑器)</h1>
 
 <p align="center">
+  <img src="./public/icon.ico" width="64" alt="Logo">
+</p>
+
+<p align="center">
   <strong>轻量级 Markdown 编辑器 | Windows 右键菜单集成 | 实时预览 | 专业代码高亮</strong>
-<p>
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Vue-3-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />

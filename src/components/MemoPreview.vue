@@ -26,10 +26,13 @@ import { computed, ref, watch } from 'vue'
 interface Props {
   /** Markdown 内容 */
   content: string
+  /** 当前文件路径（用于解析相对路径图片） */
+  filePath?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   content: '',
+  filePath: null,
 })
 
 // ========== Store ==========
@@ -42,6 +45,62 @@ const emit = defineEmits<{
   /** 滚动事件（用于同步滚动） */
   scroll: [percentage: number]
 }>()
+
+// ========== 工具函数 ==========
+
+/**
+ * 获取文件所在目录
+ */
+function getFileDirectory(path: string): string {
+  // 处理 Windows 和 Unix 路径分隔符
+  const lastSlashIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  if (lastSlashIndex === -1) return ''
+  return path.substring(0, lastSlashIndex)
+}
+
+/**
+ * 转换图片路径
+ * 将相对路径转换为 file:// 协议的绝对路径
+ */
+function transformImageSrc(src: string): string {
+  // 如果是绝对路径 (http://, https://, file://, data:)，直接返回
+  if (/^(https?:|file:|data:)/i.test(src)) {
+    return src
+  }
+
+  // 如果没有当前文件路径，无法解析相对路径
+  if (!props.filePath) {
+    return src
+  }
+
+  try {
+    const dir = getFileDirectory(props.filePath)
+    if (!dir) return src
+
+    // 处理路径拼接
+    // 注意：这里简单拼接，实际可能需要处理 .. 等相对路径符号
+    // 但浏览器/Electron 通常能处理 file:///path/to/../image.png
+
+    // 移除 src 开头的 ./
+    let cleanSrc = src
+    if (cleanSrc.startsWith('./')) {
+      cleanSrc = cleanSrc.substring(2)
+    }
+
+    // 确保目录路径以 / 结尾（用于拼接）
+    // 将反斜杠转换为正斜杠，以便构建 URL
+    const normalizedDir = dir.replace(/\\/g, '/')
+
+    // 构建 file:// URL
+    // Windows 路径通常以盘符开头，如 C:/...
+    // file:///C:/... 是有效格式
+    const separator = normalizedDir.endsWith('/') ? '' : '/'
+    return `file:///${normalizedDir}${separator}${cleanSrc}`
+  } catch (e) {
+    console.error('图片路径转换失败:', e)
+    return src
+  }
+}
 
 // ========== Markdown 解析器配置 ==========
 
@@ -57,6 +116,23 @@ const md = new MarkdownIt({
     return `<pre class="hljs"><code class="language-${lang}">${escapedCode}</code></pre>`
   },
 })
+
+// 自定义图片渲染规则
+const defaultImageRender = md.renderer.rules.image || function (tokens, idx, options, _env, self) {
+  return self.renderToken(tokens, idx, options)
+}
+
+md.renderer.rules.image = (tokens, idx, options, env, self) => {
+  const token = tokens[idx]
+  const srcIndex = token.attrIndex('src')
+
+  if (srcIndex >= 0) {
+    const src = token.attrs[srcIndex][1]
+    token.attrs[srcIndex][1] = transformImageSrc(src)
+  }
+
+  return defaultImageRender(tokens, idx, options, env, self)
+}
 
 // ========== 响应式状态 ==========
 
@@ -114,6 +190,13 @@ function renderMarkdown(content: string): string {
     if (node.tagName === 'IFRAME') {
       node.setAttribute('sandbox', 'allow-scripts allow-same-origin')
     }
+    // 处理 HTML 标签中的 img src (markdown-it 只能处理 markdown 语法图片)
+    if (node.tagName === 'IMG') {
+      const src = node.getAttribute('src')
+      if (src) {
+        node.setAttribute('src', transformImageSrc(src))
+      }
+    }
   })
 
   const cleanHtml = DOMPurify.sanitize(rawHtml, {
@@ -122,6 +205,7 @@ function renderMarkdown(content: string): string {
     ADD_TAGS: ['iframe'], // 允许嵌入视频
     FORBID_TAGS: ['script', 'style'], // 显式禁止脚本和样式标签
     FORBID_ATTR: ['onmouseover', 'onclick', 'onerror', 'onload'], // 显式禁止事件处理器
+    ALLOWED_URI_SCHEMES: ['http', 'https', 'ftp', 'mailto', 'tel', 'file', 'data'], // 允许 file 和 data 协议
   })
 
   return cleanHtml
@@ -141,6 +225,14 @@ watch(
     debouncedRender(newContent)
   },
   { immediate: true },
+)
+
+// 监听文件路径变化（重新渲染以更新相对路径图片）
+watch(
+  () => props.filePath,
+  () => {
+    debouncedRender(props.content)
+  }
 )
 
 // ========== 滚动同步 ==========
@@ -399,8 +491,16 @@ defineExpose({
 .markdown-body :deep(img) {
   max-width: 100%;
   border-radius: 8px;
-  margin: 16px 0;
+  margin: 8px 4px;
+  vertical-align: middle;
+  display: inline-block;
+  /* 确保是行内块级元素 */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 修复：隐藏居中段落中图片后的换行符（防止徽章纵向排列） */
+.markdown-body :deep(p[align="center"] img + br) {
+  display: none;
 }
 
 /* 空内容提示 */
