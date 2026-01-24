@@ -28,7 +28,7 @@
 ## 🖥️ 主页展示
 
 <p align="center">
-  <img src="public/welcome.png" alt="主页展示" width="100%">
+  <img src="public/welcome.png" alt="主页展示" width="800">
 </p>
 
 ---
