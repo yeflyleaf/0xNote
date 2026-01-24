@@ -151,6 +151,20 @@ npm install
 npm run electron:dev
 ```
 
+### 构建
+
+```bash
+npm run build:win
+```
+
+```bash
+npm run build:mac
+```
+
+```bash
+npm run build:linux
+```
+
 构建产物输出到 `release/` 目录。
 
 ---
