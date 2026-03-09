@@ -1,7 +1,7 @@
 <h1 align="center"> 🚀 0xNote ( Markdown 编辑器)</h1>
 
 <p align="center">
-  <img src="./public/icon.ico" width="64" alt="Logo">
+  <img src="./Frontend/public/icon.ico" width="64" alt="Logo">
 </p>
 
 <p align="center">
@@ -28,7 +28,7 @@
 ## 🖥️ 主页展示
 
 <p align="center">
-  <img src="public/welcome.png" alt="主页展示" width="800">
+  <img src="./Frontend/public/welcome.png" alt="主页展示" width="800">
 </p>
 
 ---
